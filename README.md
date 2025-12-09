@@ -17,6 +17,8 @@
 ![License](https://img.shields.io/badge/Apache_2.0-00d4ff?style=flat-square)
 ![Platform](https://img.shields.io/badge/Linux-ffaa00?style=flat-square)
 ![Tools](https://img.shields.io/badge/70+_tools-8B5CF6?style=flat-square)
+[![CI](https://github.com/Nerds489/NETREAPER/actions/workflows/ci.yml/badge.svg)](https://github.com/Nerds489/NETREAPER/actions)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 ---
 
