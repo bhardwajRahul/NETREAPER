@@ -196,9 +196,11 @@ ensure_directories() {
 log_to_file() {
     local message="$1"
     local timestamp
+    # Only log if LOG_FILE is set and the log directory exists (avoid failures in test/CI environments)
+    [[ -z "${LOG_FILE:-}" ]] && return 0
+    [[ ! -d "${LOG_FILE%/*}" ]] && return 0
     timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    # Only log if the log directory exists (avoid failures in test/CI environments)
-    [[ -d "${LOG_FILE%/*}" ]] && echo "[$timestamp] $message" >> "$LOG_FILE" 2>/dev/null || true
+    echo "[$timestamp] $message" >> "$LOG_FILE" 2>/dev/null || true
 }
 
 log_debug() {
