@@ -9,7 +9,7 @@ All notable changes to NETREAPER.
 - Authorization flow on first run
 - Target validation (blocks dangerous operations by default)
 - `NR_UNSAFE_MODE` environment variable for advanced users
-- Bats test suite (49 tests)
+- Bats test suite (47 tests)
 - GitHub Actions CI with ShellCheck
 - `--dry-run` flag for installer
 
