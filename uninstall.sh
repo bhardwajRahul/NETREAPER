@@ -6,8 +6,8 @@ COMPDIR="${COMPDIR:-/etc/bash_completion.d}"
 CONFIG_DIR="${HOME}/.netreaper"
 
 echo "Removing netreaper..."
-rm -f "$PREFIX/netreaper" 2>/dev/null || true
-rm -f "$COMPDIR/netreaper" 2>/dev/null || true
+rm -f "$PREFIX/netreaper" "$PREFIX/netreaper-install" 2>/dev/null || true
+rm -f "$COMPDIR/netreaper" "$COMPDIR/netreaper-install" 2>/dev/null || true
 
 if [[ -d "$CONFIG_DIR" ]]; then
     read -r -p "Remove config directory $CONFIG_DIR? [y/N]: " ans

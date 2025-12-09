@@ -1,17 +1,36 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
-  shellcheck:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: ShellCheck
-        uses: ludeeus/action-shellcheck@master
-        with:
-          scandir: '.'
-          severity: error
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: ShellCheck (errors only)
+        run: |
+          shellcheck --severity=error bin/netreaper bin/netreaper-install lib/*.sh modules/*.sh
+
+      - name: Bash syntax check
+        run: |
+          for f in bin/netreaper bin/netreaper-install lib/*.sh modules/*.sh; do
+            echo "Checking $f"
+            bash -n "$f"
+          done
+
+      - name: Smoke tests
+        run: |
+          chmod +x tests/smoke/*.sh
+          tests/smoke/test_help.sh
+          tests/smoke/test_version.sh
 
   tests:
     runs-on: ubuntu-latest

@@ -9,7 +9,7 @@
 #    ╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝
 #
 #    NETREAPER - Network Security & WiFi Assault Toolkit
-#    Version: 6.1.0 "Phantom Protocol"
+#    Version: 6.2.0 "Phantom Protocol"
 #
 #    Copyright (c) 2025 OFFTRACKMEDIA Studios
 #    Licensed under the Apache License, Version 2.0
@@ -19,7 +19,7 @@
 
 set -o pipefail
 
-readonly VERSION="6.1.0"
+readonly VERSION="6.2.0"
 readonly CODENAME="Phantom Protocol"
 readonly SCRIPT_NAME="netreaper"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,6 +29,10 @@ readonly SCRIPT_DIR
 JSON_OUTPUT=0
 # shellcheck disable=SC2034  # State tracking for wireless operations
 MONITOR_IFACE=""
+
+# Dry-run mode - preview commands without executing
+NR_DRY_RUN=0
+export NR_DRY_RUN
 
 #═══════════════════════════════════════════════════════════════════════════════
 # COLOR DEFINITIONS
@@ -6524,6 +6528,7 @@ show_help_main() {
     echo -e "        -q, --quiet        Suppress non-error output"
     echo -e "        --no-color         Disable colored output"
     echo -e "        --debug            Enable debug mode"
+    echo -e "        --dry-run          Show commands without executing (safe preview mode)"
     echo -e "        --version          Show version"
     echo -e "        -h, --help         Show this help"
     echo
@@ -6901,6 +6906,7 @@ main() {
             -q|--quiet) LOG_LEVEL="ERROR"; QUIET=true; shift ;;
             --no-color) NO_COLOR=1; shift ;;
             --debug) LOG_LEVEL="DEBUG"; VERBOSE=true; shift ;;
+            --dry-run) NR_DRY_RUN=1; export NR_DRY_RUN; log_info "Dry-run mode enabled - no commands will be executed"; shift ;;
             --version) echo "$SCRIPT_NAME v$VERSION ($CODENAME)"; exit 0 ;;
             -h|--help) show_help; exit 0 ;;
             --update) check_for_update; exit 0 ;;

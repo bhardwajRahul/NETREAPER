@@ -14,7 +14,7 @@ NC='\033[0m'
 
 echo -e "${CYAN}"
 cat << 'EOF_ART'
-    ███╗   ██╗███████╗████████╗██████╗ ███████╗ █████╗ ██████╗ ███████╗██████╗ 
+    ███╗   ██╗███████╗████████╗██████╗ ███████╗ █████╗ ██████╗ ███████╗██████╗
     ████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██╔════╝██╔══██╗██╔══██╗██╔════╝██╔══██╗
     ██╔██╗ ██║█████╗     ██║   ██████╔╝█████╗  ███████║██████╔╝█████╗  ██████╔╝
     ██║╚██╗██║██╔══╝     ██║   ██╔══██╗██╔══╝  ██╔══██║██╔═══╝ ██╔══╝  ██╔══██╗
@@ -22,7 +22,7 @@ cat << 'EOF_ART'
     ╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝
 EOF_ART
 echo -e "${NC}"
-echo -e "    ${CYAN}NETREAPER v6.1.0 Installer${NC}"
+echo -e "    ${CYAN}NETREAPER v6.2.0 Installer${NC}"
 echo
 
 # Check root
@@ -32,22 +32,25 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
+# Get script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Installation paths
 PREFIX="${PREFIX:-/usr/local/bin}"
 COMPLETION_DIR="/etc/bash_completion.d"
 
 echo -e "    ${CYAN}[*]${NC} Installing to ${PREFIX}..."
 
-# Install main scripts
-install -m 755 netreaper "$PREFIX/netreaper"
+# Install main scripts from bin/
+install -m 755 "$SCRIPT_DIR/bin/netreaper" "$PREFIX/netreaper"
 echo -e "    ${GREEN}[✓]${NC} Installed netreaper"
 
-install -m 755 netreaper-install "$PREFIX/netreaper-install"
+install -m 755 "$SCRIPT_DIR/bin/netreaper-install" "$PREFIX/netreaper-install"
 echo -e "    ${GREEN}[✓]${NC} Installed netreaper-install"
 
 # Install bash completion
 if [[ -d "$COMPLETION_DIR" ]]; then
-    install -m 644 completions/netreaper.bash "$COMPLETION_DIR/netreaper"
+    install -m 644 "$SCRIPT_DIR/completions/netreaper.bash" "$COMPLETION_DIR/netreaper"
     echo -e "    ${GREEN}[✓]${NC} Installed bash completion"
 fi
 
@@ -58,7 +61,7 @@ echo -e "    ${GREEN}[✓]${NC} Created /etc/netreaper"
 
 echo
 echo -e "    ${GREEN}════════════════════════════════════════════════════════${NC}"
-echo -e "    ${GREEN}    ✓ NETREAPER v6.1.0 installed successfully!${NC}"
+echo -e "    ${GREEN}    ✓ NETREAPER v6.2.0 installed successfully!${NC}"
 echo -e "    ${GREEN}════════════════════════════════════════════════════════${NC}"
 echo
 echo -e "    ${CYAN}Quick Start:${NC}"

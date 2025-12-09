@@ -2,6 +2,48 @@
 
 All notable changes to NETREAPER.
 
+## [6.2.0] - 2024-12-09
+
+### Added
+- `bin/` directory for executables (professional structure)
+- `tests/smoke/` directory with smoke tests
+- `docs/images/` directory for screenshots
+- `--dry-run` flag for safe command preview
+- `nr_run()` and `nr_run_eval()` wrapper functions in lib/core.sh
+- "First 60 Seconds" quickstart section in README
+- "Why NETREAPER?" comparison table in README
+- "Dry-Run Mode" documentation in README
+- "Project History" section in README
+- CI badge in README
+- Release workflow (.github/workflows/release.yml)
+
+### Changed
+- Moved `netreaper` → `bin/netreaper`
+- Moved `netreaper-install` → `bin/netreaper-install`
+- `install.sh` is now thin wrapper calling `bin/netreaper-install`
+- CI workflow updated for `bin/` structure
+- README completely overhauled with landing page style
+- Installer version synced to main version (6.2.0)
+
+### Fixed
+- uninstall.sh now removes both netreaper and netreaper-install
+
+### Structure
+```
+bin/
+  netreaper           # Main toolkit
+  netreaper-install   # Tool installer
+lib/                  # Core libraries
+modules/              # Feature modules
+tests/
+  smoke/              # Smoke tests
+  *.bats              # Bats tests
+docs/
+  images/             # Screenshots
+install.sh            # System installer (wrapper)
+uninstall.sh          # Uninstaller
+```
+
 ## [6.1.0] - 2024-12-09
 
 ### Changed
@@ -75,6 +117,7 @@ modules/osint.sh       - OSINT gathering
 
 ---
 
+[6.2.0]: https://github.com/Nerds489/NETREAPER/releases/tag/v6.2.0
 [6.1.0]: https://github.com/Nerds489/NETREAPER/releases/tag/v6.1.0
 [6.0.1]: https://github.com/Nerds489/NETREAPER/releases/tag/v6.0.1
 [6.0.0]: https://github.com/Nerds489/NETREAPER/releases/tag/v6.0.0

@@ -277,12 +277,36 @@ init_logging() {
 }
 
 #═══════════════════════════════════════════════════════════════════════════════
+# DRY-RUN EXECUTION WRAPPERS
+#═══════════════════════════════════════════════════════════════════════════════
+
+# Safe command execution wrapper
+# Respects NR_DRY_RUN flag - prints command instead of executing
+nr_run() {
+    if [[ "${NR_DRY_RUN:-0}" -eq 1 ]]; then
+        echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} $*" >&2
+        return 0
+    fi
+    "$@"
+}
+
+# For commands that need shell evaluation
+nr_run_eval() {
+    if [[ "${NR_DRY_RUN:-0}" -eq 1 ]]; then
+        echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} $*" >&2
+        return 0
+    fi
+    eval "$@"
+}
+
+#═══════════════════════════════════════════════════════════════════════════════
 # EXPORT FUNCTIONS
 #═══════════════════════════════════════════════════════════════════════════════
 
 export -f log_info log_error log_success log_warning
 export -f log_debug log_verbose log_fatal log_audit log_to_file log_command_preview
 export -f log_attack log_target log_loot init_logging
+export -f nr_run nr_run_eval
 export -f ensure_directories
 export -f _netreaper_error_handler _netreaper_cleanup
 

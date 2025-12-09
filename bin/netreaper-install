@@ -11,7 +11,7 @@
 
 set -o pipefail
 
-readonly VERSION="3.1.0"
+readonly VERSION="6.2.0"
 readonly SCRIPT_NAME="netreaper-install"
 
 # Colors
@@ -691,6 +691,10 @@ show_system_banner() {
     echo -e "${C_SHADOW}│${C_RESET} Package Manager: ${C_GREEN}${PKG_MANAGER}${C_RESET}"
     echo -e "${C_SHADOW}└─────────────────────────────────────┘${C_RESET}"
 }
+
+# Dry-run mode
+NR_DRY_RUN=0
+export NR_DRY_RUN
 
 # Logging
 log_info()    { echo -e "    ${C_CYAN}[*]${C_RESET} $*"; }
@@ -1953,7 +1957,10 @@ show_menu() {
 show_usage() {
     echo "NETREAPER Arsenal Installer v${VERSION}"
     echo
-    echo "Usage: sudo $SCRIPT_NAME [command]"
+    echo "Usage: sudo $SCRIPT_NAME [options] [command]"
+    echo
+    echo "Options:"
+    echo "    --dry-run    Simulate installation without making changes"
     echo
     echo "Commands:"
     echo "    all          Install all tools"
@@ -1971,6 +1978,21 @@ show_usage() {
 }
 
 main() {
+    # Parse arguments
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --dry-run)
+                NR_DRY_RUN=1
+                export NR_DRY_RUN
+                echo -e "${C_CYAN}[*]${C_RESET} Dry-run mode enabled"
+                shift
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
     case "${1:-menu}" in
         all)
             preflight_checks

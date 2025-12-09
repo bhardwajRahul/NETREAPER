@@ -1,4 +1,4 @@
-# ☠️ NETREAPER
+# NETREAPER
 
 ```
  ███╗   ██╗███████╗████████╗██████╗ ███████╗ █████╗ ██████╗ ███████╗██████╗
@@ -9,137 +9,147 @@
  ╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝
 ```
 
-**v6.1.0 — Phantom Protocol**
+**Network Security & Penetration Testing Toolkit**
 
-[![Version](https://img.shields.io/badge/v6.1.0-ff0040?style=flat-square)](https://github.com/Nerds489/NETREAPER/releases)
-[![License](https://img.shields.io/badge/Apache_2.0-00d4ff?style=flat-square)](LICENSE)
-[![Platform](https://img.shields.io/badge/Linux-ffaa00?style=flat-square)](https://github.com/Nerds489/NETREAPER)
-[![Tools](https://img.shields.io/badge/70+_tools-8B5CF6?style=flat-square)](https://github.com/Nerds489/NETREAPER)
-[![Sponsor](https://img.shields.io/badge/Sponsor-♥-ff69b4?style=flat-square)](https://github.com/sponsors/Nerds489)
+70+ tools. One CLI. Stop juggling terminals.
 
----
-
-70+ security tools. One CLI. Stop juggling terminals.
+[![Version](https://img.shields.io/github/v/tag/Nerds489/NETREAPER?label=version&style=flat-square&color=ff0040)](https://github.com/Nerds489/NETREAPER/releases)
+[![CI](https://github.com/Nerds489/NETREAPER/actions/workflows/ci.yml/badge.svg)](https://github.com/Nerds489/NETREAPER/actions)
+[![License](https://img.shields.io/badge/license-Apache_2.0-00d4ff?style=flat-square)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Linux-ffaa00?style=flat-square)](https://github.com/Nerds489/NETREAPER)
+[![Sponsor](https://img.shields.io/badge/sponsor-♥-ff69b4?style=flat-square)](https://github.com/sponsors/Nerds489)
 
 ---
 
-## Install
+## Installation
 
 ```bash
 git clone https://github.com/Nerds489/NETREAPER.git
 cd NETREAPER
-sudo ./netreaper-install
+sudo ./install.sh
 ```
 
-**Options:**
-
+Install tools:
 ```bash
 sudo netreaper-install essentials  # Core tools (~500MB)
 sudo netreaper-install all         # Everything (~3-5GB)
 sudo netreaper-install wireless    # WiFi arsenal
-sudo netreaper-install scanning    # Port/service scanners
+sudo netreaper-install scanning    # Port scanners
 sudo netreaper-install exploit     # Exploitation tools
 sudo netreaper-install creds       # Password crackers
 sudo netreaper-install osint       # Reconnaissance
-sudo netreaper-install status      # What's installed
 ```
-
-**Works on:** Kali, Parrot, Ubuntu, Debian, Fedora, RHEL, Arch, Manjaro, openSUSE, Alpine
 
 ---
 
-## Usage
+## First 60 Seconds
 
 ```bash
-sudo netreaper                      # Interactive menu
-sudo netreaper scan 192.168.1.0/24  # Scan subnet
-sudo netreaper wifi --monitor wlan0 # Monitor mode
-sudo netreaper wizard scan          # Guided wizard
-sudo netreaper status               # Tool status
+# 1. See what's installed
+netreaper status
+
+# 2. Run a quick scan
+sudo netreaper scan 192.168.1.0/24
+
+# 3. Check your logs
+ls ~/.netreaper/logs/
+
+# 4. Get help
+netreaper --help
 ```
 
 ---
 
-## What's In It
+## Why NETREAPER?
 
-| Category | Tools |
-|----------|-------|
-| **Recon** | nmap, masscan, rustscan, netdiscover, dnsenum, sslscan |
-| **Wireless** | aircrack-ng, wifite, bettercap, reaver, hcxdumptool |
-| **Exploit** | metasploit, sqlmap, nikto, gobuster, nuclei, wpscan |
-| **Creds** | hashcat, john, hydra, medusa, crackmapexec |
-| **Traffic** | tcpdump, wireshark, hping3, iperf3 |
-| **OSINT** | theharvester, recon-ng, shodan, amass |
-
-Plus 40+ more. Run `netreaper status` for the full list.
+| Problem | Solution |
+|---------|----------|
+| 47 terminal windows, 20 tools, zero consistency | One entrypoint, unified logging, shared config |
+| Reinstalling your stack on every new machine | Single installer, reproducible setup |
+| Forgetting which flags work with which tool | Consistent interface, built-in presets |
+| Scattered output files everywhere | Organized session-based output in `~/.netreaper/` |
 
 ---
 
-## v6.0 Architecture
+## Dry-Run Mode
+
+Preview commands without executing:
+
+```bash
+netreaper --dry-run scan 192.168.1.0/24
+sudo netreaper-install --dry-run all
+```
+
+All commands print with `[DRY-RUN]` prefix instead of running.
+
+---
+
+## Features
+
+- **70+ integrated tools** -- nmap, aircrack-ng, hashcat, hydra, and more
+- **Multi-distro support** -- Debian, Ubuntu, Kali, Fedora, Arch, and more
+- **Session management** -- Organized output in timestamped directories
+- **Comprehensive logging** -- Full audit trail of all commands
+- **Smart installer** -- Auto-detects distro, installs dependencies
+- **Modular architecture** -- Easy to extend and customize
+
+---
+
+## Supported Distributions
+
+| Family | Distros |
+|--------|---------|
+| Debian | Ubuntu, Kali, Parrot, Mint |
+| RHEL | Fedora, CentOS, Rocky, Alma |
+| Arch | Arch, Manjaro, EndeavourOS |
+| SUSE | openSUSE Tumbleweed/Leap |
+
+---
+
+## Project Structure
 
 ```
 NETREAPER/
-├── netreaper              # Main dispatcher
-├── netreaper-install      # Arsenal installer
-├── lib/                   # Core libraries
-│   ├── core.sh            # Logging, colors, paths
-│   ├── ui.sh              # Menus and prompts
-│   ├── safety.sh          # Authorization & validation
-│   ├── detection.sh       # System detection
-│   └── utils.sh           # Helpers
-├── modules/               # Feature modules
-│   ├── recon.sh
-│   ├── wireless.sh
-│   ├── scanning.sh
-│   ├── exploit.sh
-│   ├── credentials.sh
-│   ├── traffic.sh
-│   └── osint.sh
-└── tests/                 # Bats test suite
+├── bin/                 # Executables
+│   ├── netreaper
+│   └── netreaper-install
+├── lib/                 # Core libraries
+├── modules/             # Tool modules
+├── tests/               # Test suites
+├── docs/                # Documentation
+└── completions/         # Shell completions
 ```
 
 ---
 
-## What It Does
+## Project History
 
-- **Wraps tools** — Unified interface, consistent output
-- **Organizes output** — Everything goes to `~/.netreaper/`
-- **Validates targets** — Blocks dangerous operations by default
-- **Logs everything** — Timestamped audit trail
-- **Works everywhere** — Detects distro, uses correct package manager
+NETREAPER has been in active development since early 2025 as an internal penetration testing toolkit.
 
-## What It Doesn't Do
+The public GitHub repository was created December 9, 2025. Prior commit history exists only in local backups.
 
-- Replace knowing the underlying tools
-- Give you permission to test things you don't own
-- Make unauthorized access legal
+Expect rapid iteration until the v6.x architecture stabilizes.
 
 ---
 
-## Legal
+## License
 
-**Authorized testing only.**
+**Apache License 2.0** -- See [LICENSE](LICENSE)
 
-You need written permission. You're responsible for your actions. Unauthorized access is a crime.
+No EULA. No additional terms. Use freely.
 
-See [LICENSE](LICENSE) and [NOTICE](NOTICE) for full terms.
-
----
-
-## Support
-
-If NETREAPER saves you time, consider sponsoring:
-
-[![Sponsor Nerds489](https://img.shields.io/badge/Sponsor_on_GitHub-♥-ff69b4?style=for-the-badge&logo=github-sponsors)](https://github.com/sponsors/Nerds489)
+**Legal Notice:** Use only on systems you own or have explicit written permission to test. Unauthorized access is illegal.
 
 ---
 
 ## Links
 
+- [Contributing](CONTRIBUTING.md)
+- [Security Policy](SECURITY.md)
+- [Support](docs/SUPPORT.md)
 - [Releases](https://github.com/Nerds489/NETREAPER/releases)
 - [Issues](https://github.com/Nerds489/NETREAPER/issues)
-- [Discussions](https://github.com/Nerds489/NETREAPER/discussions)
 
 ---
 
-**© 2025 OFFTRACKMEDIA Studios** — Apache 2.0
+**© 2025 OFFTRACKMEDIA Studios**
