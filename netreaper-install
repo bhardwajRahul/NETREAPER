@@ -11,7 +11,7 @@
 
 set -o pipefail
 
-readonly VERSION="3.0.0"
+readonly VERSION="3.1.0"
 readonly SCRIPT_NAME="netreaper-install"
 
 # Colors
@@ -96,6 +96,7 @@ detect_distro_family() {
 }
 
 # Detect and set package manager
+# shellcheck disable=SC2034  # PKG_* vars available for external use
 detect_package_manager() {
     if command -v apt-get &>/dev/null; then
         PKG_MANAGER="apt"
@@ -748,6 +749,7 @@ handle_error() {
 
 # Tool definitions
 # Format: [tool]="binary:package:primary_method:fallback_method"
+# shellcheck disable=SC2034  # Used by install functions
 declare -A TOOLS=(
     # SCANNING
     [nmap]="nmap:nmap:apt:-"
@@ -1489,7 +1491,6 @@ show_install_summary() {
 
             read -rp "    Open in new terminal? [y/N]: " new_term
             if [[ "${new_term,,}" == "y" ]]; then
-                local term_cmd=""
                 local term_launched=false
 
                 # Try various terminal emulators
@@ -1627,14 +1628,23 @@ show_status() {
 #═══════════════════════════════════════════════════════════════════════════════
 
 # Tool arrays for scanning (matches CATEGORIES but in array format for iteration)
+# shellcheck disable=SC2034  # Used for category iteration and status display
 SCANNING_TOOLS=(nmap masscan rustscan zmap arp-scan netdiscover hping3 fping)
+# shellcheck disable=SC2034
 WIRELESS_TOOLS=(aircrack-ng reaver bully pixiewps wifite bettercap mdk3 mdk4 hostapd cowpatty hcxdumptool hcxtools)
+# shellcheck disable=SC2034
 WEB_TOOLS=(nikto sqlmap dirb gobuster wpscan ffuf nuclei httpx subfinder amass)
+# shellcheck disable=SC2034
 EXPLOIT_TOOLS=(metasploit-framework exploitdb crackmapexec)
+# shellcheck disable=SC2034
 OSINT_TOOLS=(theharvester recon-ng maltego shodan)
+# shellcheck disable=SC2034
 CREDS_TOOLS=(hashcat john hydra medusa)
+# shellcheck disable=SC2034
 TRAFFIC_TOOLS=(tcpdump wireshark tshark ettercap)
+# shellcheck disable=SC2034
 STRESS_TOOLS=(hping3 iperf3)
+# shellcheck disable=SC2034
 POST_TOOLS=(empire)
 
 # Generate a progress bar

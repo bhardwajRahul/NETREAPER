@@ -9,9 +9,9 @@
  ╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝
 ```
 
-**v6.0.0 — Phantom Protocol**
+**v6.1.0 — Phantom Protocol**
 
-[![Version](https://img.shields.io/badge/v6.0.0-ff0040?style=flat-square)](https://github.com/Nerds489/NETREAPER/releases)
+[![Version](https://img.shields.io/badge/v6.1.0-ff0040?style=flat-square)](https://github.com/Nerds489/NETREAPER/releases)
 [![License](https://img.shields.io/badge/Apache_2.0-00d4ff?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/Linux-ffaa00?style=flat-square)](https://github.com/Nerds489/NETREAPER)
 [![Tools](https://img.shields.io/badge/70+_tools-8B5CF6?style=flat-square)](https://github.com/Nerds489/NETREAPER)

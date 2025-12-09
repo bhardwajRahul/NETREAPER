@@ -9,7 +9,7 @@
 #    ╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝
 #
 #    NETREAPER - Network Security & WiFi Assault Toolkit
-#    Version: 5.3.1 "Phantom Protocol"
+#    Version: 6.1.0 "Phantom Protocol"
 #
 #    Copyright (c) 2025 OFFTRACKMEDIA Studios
 #    Licensed under the Apache License, Version 2.0
@@ -19,14 +19,16 @@
 
 set -o pipefail
 
-readonly VERSION="6.0.1"
+readonly VERSION="6.1.0"
 readonly CODENAME="Phantom Protocol"
 readonly SCRIPT_NAME="netreaper"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
 
+# shellcheck disable=SC2034  # Exported for external use
 JSON_OUTPUT=0
-MONITOR_IFACE=""  # Tracks current monitor mode interface
+# shellcheck disable=SC2034  # State tracking for wireless operations
+MONITOR_IFACE=""
 
 #═══════════════════════════════════════════════════════════════════════════════
 # COLOR DEFINITIONS
@@ -69,17 +71,25 @@ if [[ -t 1 ]] && [[ "${NO_COLOR:-}" != "1" ]]; then
     C_WARNING="$C_YELLOW"
     C_INFO="$C_CYAN"
 else
-    # No colors
+    # No colors (exported for modules, hence shellcheck disable)
+    # shellcheck disable=SC2034
     C_RESET='' C_BLACK='' C_RED='' C_GREEN='' C_YELLOW=''
+    # shellcheck disable=SC2034
     C_BLUE='' C_PURPLE='' C_CYAN='' C_WHITE=''
+    # shellcheck disable=SC2034
     C_BOLD='' C_BRED='' C_BGREEN='' C_BYELLOW='' C_BCYAN=''
+    # shellcheck disable=SC2034
     C_FIRE='' C_BLOOD='' C_GHOST='' C_SHADOW='' C_BORDER=''
+    # shellcheck disable=SC2034
     C_PROMPT='' C_ORANGE='' C_SUCCESS='' C_ERROR='' C_WARNING='' C_INFO=''
 fi
 
-# Legacy aliases to preserve existing styling
+# Legacy aliases to preserve existing styling (exported for modules)
+# shellcheck disable=SC2034
 readonly C_VENOM="${C_GREEN}"
+# shellcheck disable=SC2034
 readonly C_SKULL="${C_WHITE}"
+# shellcheck disable=SC2034
 readonly C_GOLD="${C_ORANGE}"
 
 # Compatibility for legacy color references
@@ -168,6 +178,7 @@ enable_monitor_mode() {
 }
 
 # Disable monitor mode with verification
+# shellcheck disable=SC2034  # MONITOR_IFACE is global state
 disable_monitor_mode() {
     local iface="$1"
 
@@ -313,6 +324,7 @@ detect_distro_family() {
 }
 
 # Detect and set package manager
+# shellcheck disable=SC2034  # PKG_* vars available for external scripts/modules
 detect_package_manager() {
     if command -v apt-get &>/dev/null; then
         PKG_MANAGER="apt"
@@ -921,9 +933,12 @@ if [[ -f "$NETREAPER_HOME/history" && ! -f "$HISTORY_FILE" ]]; then
     mv "$NETREAPER_HOME/history" "$HISTORY_FILE" 2>/dev/null || cp "$NETREAPER_HOME/history" "$HISTORY_FILE" 2>/dev/null
 fi
 
-# Compatibility/legacy paths
+# Compatibility/legacy paths (exported for modules)
+# shellcheck disable=SC2034
 BASE_LOG_DIR="$LOG_DIR"
+# shellcheck disable=SC2034
 BASE_OUTPUT_DIR="$OUTPUT_DIR"
+# shellcheck disable=SC2034
 BASE_LOOT_DIR="$LOOT_DIR"
 SESSIONS_DIR="$SESSION_DIR"
 SESSION_FILE="${SESSION_DIR}/.current_session"
@@ -1494,13 +1509,21 @@ declare -a TOOLS_DNS=(dnsenum dnsmap dnsrecon fierce)
 declare -a TOOLS_SNMP=(onesixtyone snmpwalk snmpcheck)
 # shellcheck disable=SC2034
 declare -a TOOLS_SMB=(smbmap smbclient enum4linux)
+# shellcheck disable=SC2034
 declare -a TOOLS_SSL=(sslscan sslyze testssl.sh)
+# shellcheck disable=SC2034
 declare -a TOOLS_TRAFFIC=(tcpdump wireshark tshark ettercap bettercap)
+# shellcheck disable=SC2034
 declare -a TOOLS_WEB=(nikto wpscan sqlmap dirb gobuster ffuf burpsuite nuclei httpx subfinder amass)
+# shellcheck disable=SC2034
 declare -a TOOLS_WIFI=(aircrack-ng airmon-ng airodump-ng aireplay-ng wifite reaver bully pixiewps bettercap fluxion wifiphisher mdk3 mdk4 cowpatty)
+# shellcheck disable=SC2034
 declare -a TOOLS_EXPLOIT=(metasploit-framework searchsploit empire covenant crackmapexec)
+# shellcheck disable=SC2034
 declare -a TOOLS_CREDS=(hashcat john hydra medusa crackmapexec cowpatty)
+# shellcheck disable=SC2034
 declare -a TOOLS_POST=(impacket-secretsdump impacket-smbclient impacket-psexec impacket-wmiexec mimikatz)
+# shellcheck disable=SC2034
 declare -a TOOLS_OSINT=(theharvester recon-ng maltego shodan)
 # shellcheck disable=SC2034
 declare -a TOOLS_UTIL=(netcat ncat socat proxychains)
@@ -2421,14 +2444,8 @@ first_run_wizard() {
     echo -e "    ${C_SHADOW}Let me help you get set up.${C_RESET}"
     echo
 
-    show_legal
-    read -r response
-    if [[ "$response" != "I ACCEPT" ]]; then
-        log_fatal "You must accept the terms to use NETREAPER"
-    fi
-    mkdir -p "$(dirname "$LEGAL_FILE")"
-    echo "$(date -Iseconds) | $(whoami)@$(hostname) | Accepted" > "$LEGAL_FILE"
-    log_success "Terms accepted"
+    # Use check_legal for consistent acceptance handling
+    check_legal
 
     echo
     echo -e "    ${C_CYAN}━━━ Configuration ━━━${C_RESET}"

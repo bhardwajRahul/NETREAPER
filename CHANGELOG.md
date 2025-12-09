@@ -2,6 +2,31 @@
 
 All notable changes to NETREAPER.
 
+## [6.1.0] - 2024-12-09
+
+### Changed
+- **License Clarification**: NETREAPER is 100% Apache 2.0 with no additional restrictions
+- Removed EULA directory and all associated acceptance language
+- Version standardization: single source of truth from VERSION file
+- Code cleanup: added shellcheck disable directives for intentionally exported variables
+
+### Fixed
+- ShellCheck warnings properly addressed (not hidden with severity config)
+- SC2034: Added explicit directives for exported variables (colors, PKG_*, TOOLS_*)
+- Syntax error in first_run_wizard() from empty if-then block
+- Version inconsistencies across all script files
+
+### Removed
+- `EULA/` directory completely removed
+- All EULA/terms acceptance language from scripts
+- Unused `term_cmd` variable from netreaper-install
+
+## [6.0.1] - 2024-12-09
+
+### Fixed
+- CI test fixes for detection.bats
+- Prevented log_to_file from failing in CI environments
+
 ## [6.0.0] - 2024-12-09
 
 ### Added
@@ -50,6 +75,8 @@ modules/osint.sh       - OSINT gathering
 
 ---
 
+[6.1.0]: https://github.com/Nerds489/NETREAPER/releases/tag/v6.1.0
+[6.0.1]: https://github.com/Nerds489/NETREAPER/releases/tag/v6.0.1
 [6.0.0]: https://github.com/Nerds489/NETREAPER/releases/tag/v6.0.0
 [5.3.1]: https://github.com/Nerds489/NETREAPER/releases/tag/v5.3.1
 [5.3.0]: https://github.com/Nerds489/NETREAPER/releases/tag/v5.3.0
