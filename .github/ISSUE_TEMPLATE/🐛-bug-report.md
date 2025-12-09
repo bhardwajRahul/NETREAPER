@@ -1,5 +1,5 @@
 ---
-name: Bug
+name: "\U0001F41B Bug Report"
 about: Report a bug or unexpected behavior in NETREAPER
 title: "[BUG]"
 labels: bug
