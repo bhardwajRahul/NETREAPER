@@ -13,12 +13,13 @@
 
 **v5.3.2 — Phantom Protocol**
 
-![Version](https://img.shields.io/badge/v5.3.2-ff0040?style=flat-square)
-![License](https://img.shields.io/badge/Apache_2.0-00d4ff?style=flat-square)
-![Platform](https://img.shields.io/badge/Linux-ffaa00?style=flat-square)
-![Tools](https://img.shields.io/badge/70+_tools-8B5CF6?style=flat-square)
-![CI](https://github.com/Nerds489/NETREAPER/actions/workflows/ci.yml/badge.svg)
-![CodeQL](https://github.com/Nerds489/NETREAPER/actions/workflows/codeql.yml/badge.svg)
+
+[![Version](https://img.shields.io/badge/version-5.3.2-ff0040?style=for-the-badge&logo=ghost&logoColor=white)](https://github.com/Nerds489/NETREAPER/releases)
+[![License](https://img.shields.io/badge/license-Apache_2.0-00d4ff?style=for-the-badge&logo=apache&logoColor=white)](LICENSE)
+[![Platform](https://img.shields.io/badge/linux-Multi--Distro-ffaa00?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/Nerds489/NETREAPER)
+[![Bash](https://img.shields.io/badge/bash-5.0+-4EAA25?style=for-the-badge&logo=gnu-bash&logoColor=white)](https://www.gnu.org/software/bash/)
+[![Tools](https://img.shields.io/badge/tools-70+-8B5CF6?style=for-the-badge&logo=hackthebox&logoColor=white)](https://github.com/Nerds489/NETREAPER)
+
 
 ---
 
