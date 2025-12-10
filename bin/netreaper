@@ -2546,7 +2546,14 @@ run_with_sudo() {
         fi
     done
 
-    sudo -E bash -c "$(declare -f); ${env_decls}set -uo pipefail; ${func_name}${args_quoted}"
+    # Use heredoc to pass script via stdin - avoids "argument list too long" (E2BIG)
+    # when declare -f output exceeds ARG_MAX limit (~2MB)
+    sudo -E bash -s <<EOFSCRIPT
+$(declare -f)
+${env_decls}
+set -uo pipefail
+${func_name}${args_quoted}
+EOFSCRIPT
 }
 
 confirm() {
