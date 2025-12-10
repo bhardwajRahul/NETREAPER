@@ -88,6 +88,10 @@ clear_screen() {
 }
 
 pause() {
+    # Skip pause in non-interactive mode
+    if [[ "${NR_NON_INTERACTIVE:-0}" == "1" ]] || [[ ! -t 0 ]]; then
+        return 0
+    fi
     echo
     echo -ne "    ${C_SHADOW}Press Enter to continue...${C_RESET}"
     read -r
@@ -178,6 +182,12 @@ get_target_input() {
     local default="${2:-}"
     local target=""
 
+    # Non-interactive mode: return default or empty
+    if [[ "${NR_NON_INTERACTIVE:-0}" == "1" ]] || [[ ! -t 0 ]]; then
+        echo "$default"
+        return 0
+    fi
+
     if [[ -n "$default" ]]; then
         echo -ne "    ${C_PROMPT}${prompt} ${C_SHADOW}[${default}]${C_RESET}: " >&2
     else
@@ -198,6 +208,12 @@ get_input() {
     local default="${2:-}"
     local input=""
 
+    # Non-interactive mode: return default or empty
+    if [[ "${NR_NON_INTERACTIVE:-0}" == "1" ]] || [[ ! -t 0 ]]; then
+        echo "$default"
+        return 0
+    fi
+
     if [[ -n "$default" ]]; then
         echo -ne "    ${C_PROMPT}${prompt} ${C_SHADOW}[${default}]${C_RESET}: " >&2
     else
@@ -217,6 +233,12 @@ get_password_input() {
     local prompt="${1:-Password}"
     local password=""
 
+    # Non-interactive mode: return empty
+    if [[ "${NR_NON_INTERACTIVE:-0}" == "1" ]] || [[ ! -t 0 ]]; then
+        echo ""
+        return 0
+    fi
+
     echo -ne "    ${C_PROMPT}${prompt}: ${C_RESET}" >&2
     read -rs password
     echo >&2  # Newline after hidden input
@@ -224,18 +246,43 @@ get_password_input() {
     echo "$password"
 }
 
+# Enhanced prompt_input with secret mode and validator support
+# Args: $1=message, $2=validator (optional), $3=default (optional), $4=secret (optional, "true" for hidden input)
 prompt_input() {
-    local message="$1" validator="${2:-}" default="${3:-}" display_default=""
+    local message="$1"
+    local validator="${2:-}"
+    local default="${3:-}"
+    local secret="${4:-false}"
+    local display_default=""
+    local input=""
+
     [[ -n "$default" ]] && display_default=" ${C_SHADOW}[$default]${C_RESET}"
+
+    # Non-interactive mode: return default or empty
+    if [[ "${NR_NON_INTERACTIVE:-0}" == "1" ]] || [[ ! -t 0 ]]; then
+        log_debug "Non-interactive: returning default for prompt '$message'"
+        echo "$default"
+        return 0
+    fi
+
     while true; do
-        echo -ne "    ${C_PROMPT}$message${display_default}: ${C_RESET}" >&2
-        read -r input
+        if [[ "$secret" == "true" ]]; then
+            echo -ne "    ${C_PROMPT}$message: ${C_RESET}" >&2
+            read -rs input
+            echo >&2  # Newline after hidden input
+        else
+            echo -ne "    ${C_PROMPT}$message${display_default}: ${C_RESET}" >&2
+            read -r input
+        fi
+
         input="${input:-$default}"
         input=$(strip_ansi "$input")
+
         if [[ -z "$input" ]]; then
             log_warning "Input required"
             continue
         fi
+
         if [[ -n "$validator" ]]; then
             if $validator "$input"; then
                 echo "$input"
@@ -245,6 +292,7 @@ prompt_input() {
                 continue
             fi
         fi
+
         echo "$input"
         return 0
     done
@@ -254,9 +302,27 @@ prompt_input() {
 # CONFIRMATION FUNCTIONS
 #═══════════════════════════════════════════════════════════════════════════════
 
+# Simple yes/no confirmation with non-interactive support
+# Args: $1=message, $2=default (y/n)
+# Returns: 0 if yes, 1 if no
 confirm() {
-    local message="${1:-Continue?}" default="${2:-n}" prompt
-    if [[ "$default" == "y" ]]; then prompt="[Y/n]"; else prompt="[y/N]"; fi
+    local message="${1:-Continue?}"
+    local default="${2:-n}"
+    local prompt response
+
+    if [[ "$default" == "y" ]]; then
+        prompt="[Y/n]"
+    else
+        prompt="[y/N]"
+    fi
+
+    # Non-interactive mode: use default
+    if [[ "${NR_NON_INTERACTIVE:-0}" == "1" ]] || [[ ! -t 0 ]]; then
+        log_debug "Non-interactive: using default '$default' for confirm '$message'"
+        [[ "${default,,}" == "y" ]]
+        return $?
+    fi
+
     echo -ne "    ${C_PROMPT}$message $prompt: ${C_RESET}"
     read -r response
     response="${response:-$default}"
@@ -273,6 +339,13 @@ confirm_action() {
     local default="${2:-n}"
     local response=""
 
+    # Non-interactive mode: use default
+    if [[ "${NR_NON_INTERACTIVE:-0}" == "1" ]] || [[ ! -t 0 ]]; then
+        log_debug "Non-interactive: using default '$default' for confirm_action '$prompt'"
+        [[ "${default,,}" == "y" ]]
+        return $?
+    fi
+
     if [[ "$default" == "y" ]]; then
         echo -ne "    ${C_PROMPT}${prompt} [Y/n]: ${C_RESET}" >&2
     else
@@ -285,30 +358,109 @@ confirm_action() {
     [[ "${response,,}" == "y" || "${response,,}" == "yes" ]]
 }
 
+# Helper to check if unsafe mode is enabled (backward compatible)
+# Duplicated here to avoid circular dependency with safety.sh
+_ui_is_unsafe_mode_enabled() {
+    local val="${NR_UNSAFE_MODE:-0}"
+    case "${val,,}" in
+        1|true|yes|y) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# Dangerous operation confirmation requiring exact phrase match
+# Args: $1=message, $2=confirm_word (phrase user must type)
+# Returns: 0 if confirmed, 1 if not
+#
+# Non-interactive behavior:
+#   - Default: blocked (returns 1)
+#   - If NR_UNSAFE_MODE enabled: auto-accepts (returns 0)
+#   - If NR_FORCE_DANGEROUS=1: auto-accepts (returns 0)
 confirm_dangerous() {
     local message="${1:-This is a dangerous operation}"
     local confirm_word="${2:-YES}"
     local response=""
 
+    # Non-interactive mode handling
+    if [[ "${NR_NON_INTERACTIVE:-0}" == "1" ]] || [[ ! -t 0 ]]; then
+        # Check for explicit override flags
+        if _ui_is_unsafe_mode_enabled || [[ "${NR_FORCE_DANGEROUS:-0}" == "1" ]]; then
+            log_warning "Dangerous operation auto-accepted in non-interactive unsafe mode: $message"
+            log_audit "CONFIRM_DANGEROUS" "$message" "auto_accepted_non_interactive_unsafe"
+            return 0
+        fi
+
+        # Default: block dangerous operations in non-interactive mode
+        log_warning "Dangerous operation blocked in non-interactive mode: $message"
+        log_audit "CONFIRM_DANGEROUS" "$message" "blocked_non_interactive"
+        return 1
+    fi
+
     echo >&2
     echo -e "    ${C_RED}╔══════════════════════════════════════════════════════════════╗${C_RESET}" >&2
-    echo -e "    ${C_RED}║${C_RESET}  ${C_YELLOW}⚠️  WARNING: POTENTIALLY DANGEROUS OPERATION  ⚠️${C_RESET}            ${C_RED}║${C_RESET}" >&2
+    echo -e "    ${C_RED}║${C_RESET}  ${C_YELLOW}⚠  WARNING: POTENTIALLY DANGEROUS OPERATION  ⚠${C_RESET}             ${C_RED}║${C_RESET}" >&2
     echo -e "    ${C_RED}╚══════════════════════════════════════════════════════════════╝${C_RESET}" >&2
     echo >&2
     echo -e "    ${C_SHADOW}$message${C_RESET}" >&2
     echo >&2
-    echo -ne "    ${C_YELLOW}Type '${confirm_word}' to confirm: ${C_RESET}" >&2
+    echo -ne "    ${C_YELLOW}Type '${C_GREEN}${confirm_word}${C_YELLOW}' to confirm: ${C_RESET}" >&2
     read -r response
 
-    [[ "$response" == "$confirm_word" ]]
+    if [[ "$response" == "$confirm_word" ]]; then
+        log_audit "CONFIRM_DANGEROUS" "$message" "user_confirmed"
+        return 0
+    else
+        log_audit "CONFIRM_DANGEROUS" "$message" "user_declined"
+        return 1
+    fi
 }
 
 #═══════════════════════════════════════════════════════════════════════════════
 # SELECTION FUNCTIONS
 #═══════════════════════════════════════════════════════════════════════════════
 
+# Display numbered menu and get selection
+# Args: $1=prompt, $2+=options array
+# Returns: selected option via stdout, 0 on success, 1 on invalid selection
+#
+# Non-interactive behavior:
+#   - Requires NR_NON_INTERACTIVE_DEFAULT_INDEX to be set
+#   - Value must be a valid index (0-based) into the options array
+#   - Returns error if not set, non-numeric, or out of range
 select_option() {
-    local prompt="$1"; shift; local options=("$@")
+    local prompt="$1"
+    shift
+    local options=("$@")
+    local choice
+    local num_options=${#options[@]}
+
+    # Non-interactive mode handling
+    if [[ "${NR_NON_INTERACTIVE:-0}" == "1" ]] || [[ ! -t 0 ]]; then
+        local default_index="${NR_NON_INTERACTIVE_DEFAULT_INDEX:-}"
+
+        # Check if index is set
+        if [[ -z "$default_index" ]]; then
+            log_error "Non-interactive selection for '$prompt' requires NR_NON_INTERACTIVE_DEFAULT_INDEX to be set"
+            return 1
+        fi
+
+        # Check if index is numeric
+        if [[ ! "$default_index" =~ ^[0-9]+$ ]]; then
+            log_error "Non-interactive selection for '$prompt' has non-numeric default index '$default_index'"
+            return 1
+        fi
+
+        # Check if index is in range (0-based)
+        if (( default_index >= num_options )); then
+            log_error "Non-interactive selection for '$prompt' has out-of-range default index '$default_index' (options: $num_options)"
+            return 1
+        fi
+
+        log_debug "Non-interactive: selecting option index $default_index for '$prompt'"
+        echo "${options[$default_index]}"
+        return 0
+    fi
+
     echo
     echo -e "    ${C_CYAN}$prompt${C_RESET}"
     echo
@@ -320,10 +472,13 @@ select_option() {
     echo
     echo -ne "    ${C_PROMPT}Select [1-${#options[@]}]: ${C_RESET}"
     read -r choice
+
     if [[ "$choice" =~ ^[0-9]+$ ]] && ((choice >= 1 && choice <= ${#options[@]})); then
         echo "${options[$((choice-1))]}"
         return 0
     fi
+
+    log_warning "Invalid selection: $choice"
     return 1
 }
 
@@ -399,6 +554,50 @@ validate_interface() { ip link show "$1" &>/dev/null; }
 validate_file_exists() { [[ -f "$1" ]]; }
 validate_port() { local p="$1"; [[ "$p" =~ ^[0-9]+$ ]] && ((p >= 1 && p <= 65535)); }
 
+# Validate input is not empty (after stripping whitespace)
+validate_not_empty() {
+    local input="$1"
+    input="${input//[[:space:]]/}"
+    [[ -n "$input" ]]
+}
+
+# Validate input is an integer
+validate_integer() {
+    local input="$1"
+    [[ "$input" =~ ^-?[0-9]+$ ]]
+}
+
+# Validate input is a positive integer
+validate_positive_integer() {
+    local input="$1"
+    [[ "$input" =~ ^[0-9]+$ ]] && ((input > 0))
+}
+
+# Validate port range (e.g., "1-1024" or "80,443,8080")
+validate_port_range() {
+    local input="$1"
+    # Single port
+    if [[ "$input" =~ ^[0-9]+$ ]]; then
+        validate_port "$input"
+        return $?
+    fi
+    # Range format: 1-65535
+    if [[ "$input" =~ ^([0-9]+)-([0-9]+)$ ]]; then
+        local start="${BASH_REMATCH[1]}" end="${BASH_REMATCH[2]}"
+        validate_port "$start" && validate_port "$end" && ((start <= end))
+        return $?
+    fi
+    # Comma-separated list
+    if [[ "$input" =~ ^[0-9]+(,[0-9]+)*$ ]]; then
+        IFS=',' read -ra ports <<< "$input"
+        for p in "${ports[@]}"; do
+            validate_port "$p" || return 1
+        done
+        return 0
+    fi
+    return 1
+}
+
 #═══════════════════════════════════════════════════════════════════════════════
 # EXPORT FUNCTIONS
 #═══════════════════════════════════════════════════════════════════════════════
@@ -429,3 +628,4 @@ export -f operation_header operation_summary operation_footer
 
 # Validators
 export -f validate_ip validate_cidr validate_domain validate_interface validate_file_exists validate_port
+export -f validate_not_empty validate_integer validate_positive_integer validate_port_range

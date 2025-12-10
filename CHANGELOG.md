@@ -5,19 +5,44 @@ All notable changes to NETREAPER.
 ## [6.2.4] - 2025-12-10
 
 ### Added
-- Centralized logging system with log levels (DEBUG–FATAL) and file logging.
-- Smart sudo and privilege helpers (is_root, require_root, run_with_sudo, elevate_if_needed).
-- Audit trail logging for security-relevant operations.
-- Log utilities: set_log_level(), show_logs(), rotate_logs().
+- Modular dispatcher architecture (`bin/netreaper` as thin dispatcher)
+- Version handling via `lib/version.sh` (single source of truth)
+- Centralized logging system with log levels (DEBUG, INFO, SUCCESS, WARNING, ERROR, FATAL)
+- File logging to `~/.netreaper/logs/netreaper_YYYYMMDD.log`
+- Audit trail logging to `~/.netreaper/logs/audit_YYYYMMDD.log`
+- Smart sudo/privilege helpers: `is_root()`, `require_root()`, `run_with_sudo()`, `elevate_if_needed()`, `can_get_root()`
+- Target validation system: `is_valid_ip()`, `is_valid_cidr()`, `is_private_ip()`, `is_protected_ip()`, `validate_target()`
+- Public IP warnings and authorization checks with `confirm_dangerous()` integration
+- Protected IP ranges blocking (loopback, multicast, broadcast, link-local, reserved)
+- Confirmation prompts: `confirm()`, `confirm_dangerous()`, `prompt_input()`, `select_option()`
+- Input validators: `validate_not_empty()`, `validate_integer()`, `validate_positive_integer()`, `validate_port_range()`
+- `NR_UNSAFE_MODE` environment variable to bypass safety checks
+- `NR_NON_INTERACTIVE` mode for CI/headless environments
+- Dispatcher commands: `--dry-run`, `help`, `config path`
+- Unified error-handling framework: `die()`, `assert()`, `try()`, `error_handler()` with stack traces
+- Exit code constants: `EXIT_CODE_SUCCESS`, `EXIT_CODE_FAILURE`, `EXIT_CODE_INVALID_ARGS`, `EXIT_CODE_PERMISSION`, `EXIT_CODE_NETWORK`, `EXIT_CODE_TARGET_INVALID`, `EXIT_CODE_TOOL_MISSING`
+- Tool checking utilities: `require_tool()`, `check_tool()`, `get_tool_path()`
+- Safe file operations: `safe_rm()`, `safe_mkdir()`, `safe_copy()`, `safe_move()` with protected path blocking
+- Log utilities: `set_log_level()`, `show_logs()`, `rotate_logs()`, `init_logging()`
 
 ### Changed
-- bin/netreaper refactored into a thin dispatcher using modular libs and modules.
-- All scripts now read version and NETREAPER_ROOT from lib/version.sh.
+- `bin/netreaper` refactored into thin dispatcher sourcing modular libs
+- Core logic moved into `lib/core.sh`, `lib/ui.sh`, `lib/safety.sh`, `lib/detection.sh`, `lib/utils.sh`
+- All scripts now read version and `NETREAPER_ROOT` from `lib/version.sh`
+- Improved CI behavior with non-interactive logic (auto-accept prompts, skip wizards)
+- `validate_target()` now uses `confirm_dangerous()` for public IP confirmation
+- All confirmation/input functions respect `NR_NON_INTERACTIVE` mode
+- Enhanced `error_handler()` with stack trace support and audit logging
 
 ### Fixed
-- Inconsistent privilege handling and unclear root requirements for WiFi/scan/etc.
-- Lack of audit trail for security-relevant operations.
-- ORIGINAL_ARGS unbound variable error with set -u.
+- Legacy CLI incompatibilities with dispatcher
+- Public IP scanning without warnings now properly blocked or confirmed
+- `--dry-run` flag not being recognized
+- `help` command failing previously
+- `config path` command failing previously
+- `ORIGINAL_ARGS` unbound variable error with `set -u`
+- Inconsistent privilege handling and unclear root requirements
+- Lack of audit trail for security-relevant operations
 
 ## [6.2.2] - 2025-12-10
 

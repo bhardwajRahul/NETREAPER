@@ -28,17 +28,67 @@
 readonly _NETREAPER_CORE_LOADED=1
 
 #═══════════════════════════════════════════════════════════════════════════════
+# EXIT CODE CONSTANTS
+#═══════════════════════════════════════════════════════════════════════════════
+
+declare -r EXIT_CODE_SUCCESS=0
+declare -r EXIT_CODE_FAILURE=1
+declare -r EXIT_CODE_INVALID_ARGS=2
+declare -r EXIT_CODE_PERMISSION=3
+declare -r EXIT_CODE_NETWORK=4
+declare -r EXIT_CODE_TARGET_INVALID=5
+declare -r EXIT_CODE_TOOL_MISSING=6
+
+#═══════════════════════════════════════════════════════════════════════════════
 # ERROR HANDLING
 #═══════════════════════════════════════════════════════════════════════════════
 
 set -o pipefail
 
-# Trap handler for errors (can be customized by main script)
-_netreaper_error_handler() {
-    local exit_code=$?
-    local line_no=${1:-unknown}
-    echo -e "\033[0;31m[ERROR]\033[0m Script error at line $line_no (exit code: $exit_code)" >&2
+# Global flag to prevent recursive error handling
+_NETREAPER_IN_ERROR_HANDLER=0
+
+# Enhanced error handler with stack trace
+# Args: $1 = exit code, $2 = line number
+error_handler() {
+    local exit_code="${1:-1}"
+    local line_no="${2:-unknown}"
+    local func_name="${FUNCNAME[1]:-main}"
+    local bash_source="${BASH_SOURCE[1]:-unknown}"
+
+    # Prevent recursive error handling
+    [[ $_NETREAPER_IN_ERROR_HANDLER -eq 1 ]] && return $exit_code
+    _NETREAPER_IN_ERROR_HANDLER=1
+
+    # Build stack trace
+    local stack_trace=""
+    local i
+    for ((i=1; i<${#FUNCNAME[@]}; i++)); do
+        local func="${FUNCNAME[$i]:-unknown}"
+        local src="${BASH_SOURCE[$i]:-unknown}"
+        local ln="${BASH_LINENO[$((i-1))]:-?}"
+        stack_trace+="    at $func ($src:$ln)\n"
+    done
+
+    # Log error details
+    echo -e "\033[0;31m[ERROR]\033[0m Script error in $func_name at $bash_source:$line_no (exit code: $exit_code)" >&2
+    if [[ -n "$stack_trace" ]]; then
+        echo -e "\033[0;90mStack trace:\033[0m" >&2
+        echo -e "$stack_trace" >&2
+    fi
+
+    # Log to audit if available
+    if declare -f log_audit &>/dev/null; then
+        log_audit "ERROR" "$func_name at $bash_source:$line_no" "exit_code=$exit_code"
+    fi
+
+    _NETREAPER_IN_ERROR_HANDLER=0
     return $exit_code
+}
+
+# Legacy error handler (wrapper for backwards compatibility)
+_netreaper_error_handler() {
+    error_handler "$?" "${1:-unknown}"
 }
 
 # Trap handler for cleanup on exit
@@ -48,7 +98,7 @@ _netreaper_cleanup() {
 }
 
 # Set traps (can be overridden by main script)
-trap '_netreaper_error_handler $LINENO' ERR
+trap 'error_handler $? $LINENO' ERR
 trap '_netreaper_cleanup' EXIT
 
 #═══════════════════════════════════════════════════════════════════════════════
@@ -533,6 +583,129 @@ nr_run_sudo() {
 }
 
 #═══════════════════════════════════════════════════════════════════════════════
+# UNIFIED ERROR HANDLING FRAMEWORK
+#═══════════════════════════════════════════════════════════════════════════════
+
+# die() - Print fatal error, log to audit, and exit
+# Args: $1 = message, $2 = exit code (optional, default: 1)
+die() {
+    local message="${1:-Fatal error}"
+    local exit_code="${2:-$EXIT_CODE_FAILURE}"
+
+    log_error "$message"
+    log_audit "FATAL" "$message" "exit_code=$exit_code"
+
+    # Log stack trace if DEBUG enabled
+    if [[ "$DEBUG" == "true" || $CURRENT_LOG_LEVEL -le $LOG_LEVEL_DEBUG ]]; then
+        local i
+        for ((i=1; i<${#FUNCNAME[@]}; i++)); do
+            local func="${FUNCNAME[$i]:-unknown}"
+            local src="${BASH_SOURCE[$i]:-unknown}"
+            local ln="${BASH_LINENO[$((i-1))]:-?}"
+            echo -e "    ${C_GRAY}at $func ($src:$ln)${C_RESET}" >&2
+        done
+    fi
+
+    exit "$exit_code"
+}
+
+# assert() - Check a condition, log error and return 1 if false
+# Args: $1 = condition (string to eval), $2 = message on failure
+# Returns: 0 if condition true, 1 if false
+assert() {
+    local condition="$1"
+    local message="${2:-Assertion failed}"
+
+    if ! eval "$condition"; then
+        log_error "ASSERT: $message"
+        log_audit "ASSERT_FAILED" "$message" "condition=$condition"
+        return 1
+    fi
+    return 0
+}
+
+# try() - Run a command safely with error capture
+# Captures stderr, logs on failure, returns command's exit code
+# Usage: try <cmd> [args...] || die "message"
+# Returns: command's exit code
+try() {
+    local cmd_str="$*"
+    local stderr_file
+    stderr_file=$(mktemp 2>/dev/null || echo "/tmp/netreaper_try_$$")
+    local exit_code
+
+    log_debug "TRY: $cmd_str"
+    log_audit "TRY" "${cmd_str:0:200}" "started"
+
+    # Execute command, capture stderr
+    "$@" 2>"$stderr_file"
+    exit_code=$?
+
+    if [[ $exit_code -ne 0 ]]; then
+        local stderr_content=""
+        if [[ -f "$stderr_file" ]]; then
+            stderr_content=$(cat "$stderr_file" 2>/dev/null | head -5)
+        fi
+
+        log_error "Command failed (exit $exit_code): $cmd_str"
+        if [[ -n "$stderr_content" ]]; then
+            log_debug "stderr: $stderr_content"
+        fi
+        log_audit "TRY" "${cmd_str:0:200}" "failed:$exit_code"
+    else
+        log_audit "TRY" "${cmd_str:0:200}" "success"
+    fi
+
+    # Cleanup
+    rm -f "$stderr_file" 2>/dev/null
+
+    return $exit_code
+}
+
+# require_tool() - Check if a tool exists
+# Returns EXIT_CODE_TOOL_MISSING if not found; caller must handle the error.
+# This function is NOT fatal - it returns an error code rather than exiting.
+#
+# Args: $1 = binary name, $2 = optional package hint
+# Returns: 0 if tool exists, EXIT_CODE_TOOL_MISSING (6) if not
+#
+# Example usage:
+#   require_tool nmap || die "nmap is required for scanning"
+#   require_tool hashcat || { log_warning "hashcat not found, skipping"; return 1; }
+require_tool() {
+    local tool="$1"
+    local package_hint="${2:-$tool}"
+
+    if ! command -v "$tool" &>/dev/null; then
+        log_error "Required tool not found: $tool"
+        log_info "Install with: sudo apt install $package_hint"
+        log_audit "TOOL_MISSING" "$tool" "required"
+        return $EXIT_CODE_TOOL_MISSING
+    fi
+
+    log_debug "Tool available: $tool"
+    return 0
+}
+
+# check_tool() - Check if a tool exists (non-fatal)
+# Args: $1 = binary name
+# Returns: 0 if exists, 1 if not
+check_tool() {
+    local tool="$1"
+    [[ -z "$tool" ]] && return 1
+    command -v "$tool" &>/dev/null
+}
+
+# get_tool_path() - Get full path to a tool
+# Args: $1 = binary name
+# Returns: full path via stdout, empty if not found
+get_tool_path() {
+    local tool="$1"
+    [[ -z "$tool" ]] && return 1
+    command -v "$tool" 2>/dev/null
+}
+
+#═══════════════════════════════════════════════════════════════════════════════
 # EXPORT FUNCTIONS
 #═══════════════════════════════════════════════════════════════════════════════
 
@@ -559,7 +732,10 @@ export -f operation_needs_root enforce_root_for
 export -f nr_run nr_run_eval nr_run_sudo
 
 # Error handlers
-export -f _netreaper_error_handler _netreaper_cleanup
+export -f error_handler _netreaper_error_handler _netreaper_cleanup
+
+# Unified error handling framework
+export -f die assert try require_tool check_tool get_tool_path
 
 # Export variables
 export VERSION CODENAME SCRIPT_NAME
@@ -573,6 +749,8 @@ export DEFAULT_INTERFACE DEFAULT_WORDLIST DEFAULT_THEME
 export VERBOSE DEBUG QUIET
 export CURRENT_LOG_LEVEL FILE_LOGGING
 export LOG_LEVEL_DEBUG LOG_LEVEL_INFO LOG_LEVEL_SUCCESS LOG_LEVEL_WARNING LOG_LEVEL_ERROR LOG_LEVEL_FATAL
+export EXIT_CODE_SUCCESS EXIT_CODE_FAILURE EXIT_CODE_INVALID_ARGS EXIT_CODE_PERMISSION
+export EXIT_CODE_NETWORK EXIT_CODE_TARGET_INVALID EXIT_CODE_TOOL_MISSING
 export C_RESET C_BLACK C_RED C_GREEN C_YELLOW C_BLUE C_PURPLE C_CYAN C_WHITE C_GRAY
 export C_BOLD C_BRED C_BGREEN C_BYELLOW C_BCYAN
 export C_FIRE C_BLOOD C_GHOST C_SHADOW C_BORDER C_PROMPT C_ORANGE

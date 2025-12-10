@@ -406,6 +406,355 @@ run_tool_timeout() {
 }
 
 #═══════════════════════════════════════════════════════════════════════════════
+# SAFE FILE OPERATIONS
+#═══════════════════════════════════════════════════════════════════════════════
+
+# Dangerous paths that should never be removed
+declare -ga _PROTECTED_PATHS=(
+    "/"
+    "/bin"
+    "/boot"
+    "/dev"
+    "/etc"
+    "/home"
+    "/lib"
+    "/lib64"
+    "/opt"
+    "/proc"
+    "/root"
+    "/run"
+    "/sbin"
+    "/srv"
+    "/sys"
+    "/tmp"
+    "/usr"
+    "/var"
+    "$HOME"
+)
+
+# Check if a path is protected
+# Args: $1 = path
+# Returns: 0 if protected (should NOT remove), 1 if safe
+_is_protected_path() {
+    local path="$1"
+
+    # Normalize path (resolve symlinks, remove trailing slashes)
+    local normalized
+    normalized=$(realpath -s "$path" 2>/dev/null || echo "$path")
+    normalized="${normalized%/}"
+
+    # Empty path is dangerous
+    [[ -z "$normalized" ]] && return 0
+
+    # Check against protected paths
+    for protected in "${_PROTECTED_PATHS[@]}"; do
+        local norm_protected
+        norm_protected=$(realpath -s "$protected" 2>/dev/null || echo "$protected")
+        norm_protected="${norm_protected%/}"
+
+        # Exact match
+        [[ "$normalized" == "$norm_protected" ]] && return 0
+
+        # Path is parent of protected path
+        [[ "$norm_protected" == "$normalized"/* ]] && return 0
+    done
+
+    return 1
+}
+
+# safe_rm() - Safe file/directory removal with protection
+# Args: $1 = path to remove, $2 = force flag (optional, "force" to skip confirmation)
+# Returns: 0 on success, 1 on failure or blocked
+safe_rm() {
+    local path="$1"
+    local force="${2:-}"
+
+    # Validate input
+    if [[ -z "$path" ]]; then
+        log_error "safe_rm: No path specified"
+        return 1
+    fi
+
+    # Check if path exists
+    if [[ ! -e "$path" ]]; then
+        log_debug "safe_rm: Path does not exist: $path"
+        return 0  # Not an error - already gone
+    fi
+
+    # Check protected paths
+    if _is_protected_path "$path"; then
+        log_error "safe_rm: BLOCKED - Cannot remove protected path: $path"
+        log_audit "SAFE_RM" "$path" "blocked_protected"
+        return 1
+    fi
+
+    # Check if removing directory with contents
+    if [[ -d "$path" ]] && [[ "$(ls -A "$path" 2>/dev/null)" ]]; then
+        if [[ "$force" != "force" ]]; then
+            log_warning "safe_rm: Directory not empty: $path"
+            log_info "Use safe_rm \"$path\" force to remove recursively"
+            return 1
+        fi
+    fi
+
+    # Respect dry-run mode
+    if [[ "${NR_DRY_RUN:-0}" -eq 1 ]]; then
+        echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} rm -rf $path" >&2
+        return 0
+    fi
+
+    # Perform removal
+    log_debug "safe_rm: Removing $path"
+    log_audit "SAFE_RM" "$path" "started"
+
+    if rm -rf "$path" 2>/dev/null; then
+        log_audit "SAFE_RM" "$path" "success"
+        return 0
+    else
+        log_error "safe_rm: Failed to remove: $path"
+        log_audit "SAFE_RM" "$path" "failed"
+        return 1
+    fi
+}
+
+# safe_mkdir() - Safe directory creation with logging
+# Args: $1 = directory path, $2 = mode (optional, default: 755)
+# Returns: 0 on success, 1 on failure
+safe_mkdir() {
+    local path="$1"
+    local mode="${2:-755}"
+
+    # Validate input
+    if [[ -z "$path" ]]; then
+        log_error "safe_mkdir: No path specified"
+        return 1
+    fi
+
+    # Already exists
+    if [[ -d "$path" ]]; then
+        log_debug "safe_mkdir: Directory already exists: $path"
+        return 0
+    fi
+
+    # Check if path exists but is not a directory
+    if [[ -e "$path" ]]; then
+        log_error "safe_mkdir: Path exists but is not a directory: $path"
+        return 1
+    fi
+
+    # Respect dry-run mode
+    if [[ "${NR_DRY_RUN:-0}" -eq 1 ]]; then
+        echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} mkdir -p -m $mode $path" >&2
+        return 0
+    fi
+
+    # Create directory
+    log_debug "safe_mkdir: Creating $path (mode: $mode)"
+    log_audit "SAFE_MKDIR" "$path" "started"
+
+    if mkdir -p -m "$mode" "$path" 2>/dev/null; then
+        log_audit "SAFE_MKDIR" "$path" "success"
+        return 0
+    else
+        log_error "safe_mkdir: Failed to create: $path"
+        log_audit "SAFE_MKDIR" "$path" "failed"
+        return 1
+    fi
+}
+
+# safe_copy() - Safe file copy with validation
+# Signature: safe_copy [flags...] <source> <destination>
+# Flags are passed through to cp; source and destination are the last two arguments.
+# Recognizes -r, -R, --recursive for directory copies.
+# Returns: 0 on success, 1 on failure
+#
+# Examples:
+#   safe_copy file.txt /tmp/file.txt
+#   safe_copy -r /path/to/dir /tmp/backup
+#   safe_copy --recursive -p /src /dest
+safe_copy() {
+    local -a cp_args=()
+    local source=""
+    local dest=""
+    local has_recursive=false
+
+    # Need at least 2 arguments (source and dest)
+    if [[ $# -lt 2 ]]; then
+        log_error "safe_copy: Requires at least source and destination"
+        return 1
+    fi
+
+    # Collect all arguments into array
+    local -a all_args=("$@")
+    local num_args=${#all_args[@]}
+
+    # Last two arguments are source and destination
+    source="${all_args[$((num_args-2))]}"
+    dest="${all_args[$((num_args-1))]}"
+
+    # Everything before that is flags
+    local i
+    for ((i=0; i<num_args-2; i++)); do
+        local arg="${all_args[$i]}"
+        cp_args+=("$arg")
+
+        # Check for recursive flags
+        case "$arg" in
+            -r|-R|--recursive)
+                has_recursive=true
+                ;;
+            -*)
+                # Check for combined flags like -rp, -Rp, etc.
+                if [[ "$arg" =~ r|R ]]; then
+                    has_recursive=true
+                fi
+                ;;
+        esac
+    done
+
+    # Validate source
+    if [[ -z "$source" ]]; then
+        log_error "safe_copy: No source specified"
+        return 1
+    fi
+
+    # Validate destination
+    if [[ -z "$dest" ]]; then
+        log_error "safe_copy: No destination specified"
+        return 1
+    fi
+
+    # Check source exists
+    if [[ ! -e "$source" ]]; then
+        log_error "safe_copy: Source does not exist: $source"
+        return 1
+    fi
+
+    # Check if source is directory but recursive flag not provided
+    if [[ -d "$source" ]] && [[ "$has_recursive" != true ]]; then
+        log_error "safe_copy: Source is a directory, use -r, -R, or --recursive flag"
+        return 1
+    fi
+
+    # Warn if destination exists
+    if [[ -e "$dest" ]]; then
+        log_warning "safe_copy: Destination exists, will be overwritten: $dest"
+    fi
+
+    # Ensure destination directory exists
+    local dest_dir
+    if [[ -d "$dest" ]]; then
+        dest_dir="$dest"
+    else
+        dest_dir=$(dirname "$dest")
+    fi
+
+    if [[ ! -d "$dest_dir" ]]; then
+        safe_mkdir "$dest_dir" || return 1
+    fi
+
+    # Respect dry-run mode
+    if [[ "${NR_DRY_RUN:-0}" -eq 1 ]]; then
+        if [[ ${#cp_args[@]} -gt 0 ]]; then
+            echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} cp ${cp_args[*]} $source $dest" >&2
+        else
+            echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} cp $source $dest" >&2
+        fi
+        return 0
+    fi
+
+    # Perform copy with properly quoted arguments
+    log_debug "safe_copy: $source -> $dest"
+    log_audit "SAFE_COPY" "$source -> $dest" "started"
+
+    local exit_code
+    if [[ ${#cp_args[@]} -gt 0 ]]; then
+        cp "${cp_args[@]}" "$source" "$dest" 2>/dev/null
+        exit_code=$?
+    else
+        cp "$source" "$dest" 2>/dev/null
+        exit_code=$?
+    fi
+
+    if [[ $exit_code -eq 0 ]]; then
+        log_audit "SAFE_COPY" "$source -> $dest" "success"
+        return 0
+    else
+        log_error "safe_copy: Failed to copy $source to $dest"
+        log_audit "SAFE_COPY" "$source -> $dest" "failed"
+        return 1
+    fi
+}
+
+# safe_move() - Safe file move with validation
+# Args: $1 = source, $2 = destination
+# Returns: 0 on success, 1 on failure
+safe_move() {
+    local source="$1"
+    local dest="$2"
+
+    # Validate input
+    if [[ -z "$source" ]]; then
+        log_error "safe_move: No source specified"
+        return 1
+    fi
+
+    if [[ -z "$dest" ]]; then
+        log_error "safe_move: No destination specified"
+        return 1
+    fi
+
+    # Check source exists
+    if [[ ! -e "$source" ]]; then
+        log_error "safe_move: Source does not exist: $source"
+        return 1
+    fi
+
+    # Check protected paths (cannot move system files)
+    if _is_protected_path "$source"; then
+        log_error "safe_move: BLOCKED - Cannot move protected path: $source"
+        log_audit "SAFE_MOVE" "$source" "blocked_protected"
+        return 1
+    fi
+
+    # Warn if destination exists
+    if [[ -e "$dest" ]]; then
+        log_warning "safe_move: Destination exists, will be overwritten: $dest"
+    fi
+
+    # Ensure destination directory exists
+    local dest_dir
+    if [[ -d "$dest" ]]; then
+        dest_dir="$dest"
+    else
+        dest_dir=$(dirname "$dest")
+    fi
+
+    if [[ ! -d "$dest_dir" ]]; then
+        safe_mkdir "$dest_dir" || return 1
+    fi
+
+    # Respect dry-run mode
+    if [[ "${NR_DRY_RUN:-0}" -eq 1 ]]; then
+        echo -e "${C_YELLOW}[DRY-RUN]${C_RESET} mv $source $dest" >&2
+        return 0
+    fi
+
+    # Perform move
+    log_debug "safe_move: $source -> $dest"
+    log_audit "SAFE_MOVE" "$source -> $dest" "started"
+
+    if mv "$source" "$dest" 2>/dev/null; then
+        log_audit "SAFE_MOVE" "$source -> $dest" "success"
+        return 0
+    else
+        log_error "safe_move: Failed to move $source to $dest"
+        log_audit "SAFE_MOVE" "$source -> $dest" "failed"
+        return 1
+    fi
+}
+
+#═══════════════════════════════════════════════════════════════════════════════
 # MISC UTILITIES
 #═══════════════════════════════════════════════════════════════════════════════
 
@@ -462,6 +811,9 @@ export -f validate_ip validate_cidr validate_hostname validate_port validate_por
 
 # Tool execution
 export -f run_tool run_tool_silent run_tool_timeout
+
+# Safe file operations
+export -f safe_rm safe_mkdir safe_copy safe_move
 
 # Misc
 export -f is_numeric random_string elapsed_time
