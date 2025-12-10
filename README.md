@@ -33,7 +33,7 @@ NETREAPER is a modular Bash-based offensive security toolkit that unifies 70+ se
 
 ## Quick Start
 
-```bash
+
 # Clone the repository
 git clone https://github.com/OFFTRACKMEDIA/NETREAPER.git
 cd NETREAPER
