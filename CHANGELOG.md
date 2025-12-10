@@ -141,6 +141,7 @@ modules/osint.sh       - OSINT gathering
 
 ---
 
+[6.2.2]: https://github.com/Nerds489/NETREAPER/compare/v6.2.1...v6.2.2
 [6.2.1]: https://github.com/Nerds489/NETREAPER/compare/v6.2.0...v6.2.1
 [6.2.0]: https://github.com/Nerds489/NETREAPER/releases/tag/v6.2.0
 [6.1.0]: https://github.com/Nerds489/NETREAPER/releases/tag/v6.1.0
