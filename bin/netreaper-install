@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #═══════════════════════════════════════════════════════════════════════════════
 #
-#    NETREAPER ARSENAL INSTALLER v2.3.1
+#    NETREAPER ARSENAL INSTALLER v6.2.2
 #    Premium tool installation experience
 #
 #    Copyright (c) 2025 OFFTRACKMEDIA Studios
@@ -11,7 +11,7 @@
 
 set -o pipefail
 
-readonly VERSION="6.2.1"
+readonly VERSION="6.2.2"
 readonly SCRIPT_NAME="netreaper-install"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly SCRIPT_DIR

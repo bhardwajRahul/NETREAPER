@@ -2,6 +2,11 @@
 
 All notable changes to NETREAPER.
 
+## [6.2.2] - 2025-12-10
+
+### Fixed
+- Resolved E2BIG "argument list too long" error when invoking sudo with large argument expansion
+
 ## [6.2.1] - 2025-12-09
 
 ### Added
