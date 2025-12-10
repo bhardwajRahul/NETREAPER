@@ -1,476 +1,434 @@
-```
- ███╗   ██╗███████╗████████╗██████╗ ███████╗ █████╗ ██████╗ ███████╗██████╗
- ████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██╔════╝██╔══██╗██╔══██╗██╔════╝██╔══██╗
- ██╔██╗ ██║█████╗     ██║   ██████╔╝█████╗  ███████║██████╔╝█████╗  ██████╔╝
- ██║╚██╗██║██╔══╝     ██║   ██╔══██╗██╔══╝  ██╔══██║██╔═══╝ ██╔══╝  ██╔══██╗
- ██║ ╚████║███████╗   ██║   ██║  ██║███████╗██║  ██║██║     ███████╗██║  ██║
- ╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝
+<p align="center">
+  <pre style="color: #ff0000;">
+    ╔═══════════════════════════════════════════════════════════════════════════╗
+    ║                                                                           ║
+    ║  ███╗   ██╗███████╗████████╗██████╗ ███████╗ █████╗ ██████╗ ███████╗██████╗  ║
+    ║  ████╗  ██║██╔════╝╚══██╔══╝██╔══██╗██╔════╝██╔══██╗██╔══██╗██╔════╝██╔══██╗ ║
+    ║  ██╔██╗ ██║█████╗     ██║   ██████╔╝█████╗  ███████║██████╔╝█████╗  ██████╔╝ ║
+    ║  ██║╚██╗██║██╔══╝     ██║   ██╔══██╗██╔══╝  ██╔══██║██╔═══╝ ██╔══╝  ██╔══██╗ ║
+    ║  ██║ ╚████║███████╗   ██║   ██║  ██║███████╗██║  ██║██║     ███████╗██║  ██║ ║
+    ║  ╚═╝  ╚═══╝╚══════╝   ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝ ║
+    ║                                                                           ║
+    ╚═══════════════════════════════════════════════════════════════════════════╝
+  </pre>
+</p>
 
-```
+<h1 align="center">NETREAPER</h1>
+<p align="center"><strong>Offensive Security Framework</strong></p>
+<p align="center">v6.2.5 — Phase 2: Safety & Confirmations</p>
 
-**v6.2.4 — Phantom Protocol**
+<p align="center">
+  <img src="https://img.shields.io/badge/version-6.2.5-red?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square" alt="License">
+  <img src="https://img.shields.io/badge/platform-Linux-lightgrey?style=flat-square" alt="Platform">
+  <img src="https://img.shields.io/badge/shell-Bash%205.0+-green?style=flat-square" alt="Shell">
+</p>
 
-70+ security tools. One CLI. Stop juggling terminals. v6.2.4 introduces modular dispatcher architecture, a centralized logging system with configurable levels and audit trails, smart privilege handling, comprehensive target validation with safety gates, and confirmation prompts for dangerous operations.
+---
 
-## v6.2.4 Changes
+> **"Some tools scan. Some tools attack. I do both."**
 
-* **Modular Architecture:** Thin dispatcher (`bin/netreaper`) sources modular libs in dependency order
-* **Logging System:** Centralized logging with levels (DEBUG–FATAL), daily log rotation, file logging under `~/.netreaper/logs/`, and audit trail for security operations
-* **Privilege Handling:** Smart sudo helpers (`is_root`, `require_root`, `run_with_sudo`, `elevate_if_needed`, `can_get_root`) with clear error messages and non-interactive support
-* **Safety Framework:** Target validation system with IP/CIDR/hostname validation, public IP warnings, protected IP blocking, and `NR_UNSAFE_MODE` bypass
-* **Confirmation System:** `confirm()`, `confirm_dangerous()`, `prompt_input()`, `select_option()` with keyword gates for dangerous operations
-* **Error Handling:** Unified exit codes, stack traces, `die()`, `assert()`, `try()` functions
-* **Safe File Operations:** `safe_rm()`, `safe_mkdir()`, `safe_copy()`, `safe_move()` with protected path blocking
+NETREAPER is a modular Bash-based offensive security toolkit that unifies 70+ security tools behind a single CLI. Built for penetration testers, red teamers, and security researchers who need a fast, scriptable interface with proper safety guardrails.
 
-## v6.2.x Highlights
+---
 
-* Executables now live in `bin/` and are fronted by root-level wrappers (`netreaper`, `netreaper-install`) so CI, first-run tests, and legacy scripts that call `./netreaper` keep working.
-* `install.sh` simply dispatches to `bin/netreaper-install`, keeping the repository root clean while exposing wrappers for local runs.
-* Non-interactive mode detects `NR_NON_INTERACTIVE=1` or the absence of a TTY, skips the wizard, auto-accepts legal text, and keeps CI from hanging.
-* Documentation, quickstart, and helper docs were rewritten to match the new layout; everything now lives under `docs/`.
-* Official Bash, Zsh, and Fish completions ship in `completions/`; copy them into your shell's completion directory to enable them.
-* Smoke tests under `tests/smoke/` validate the wrapper binaries plus `--version`/`--help`, mirroring how CI executes the toolkit.
-* Apache 2.0 is the only license—there is no separate EULA or interactive legal prompt for automated environments.
-
-## Installation
+## Quick Start
 
 ```bash
-git clone https://github.com/Nerds489/NETREAPER.git
+# Clone the repository
+git clone https://github.com/OFFTRACKMEDIA/NETREAPER.git
 cd NETREAPER
+
+# Install (requires root for system-wide installation)
 sudo ./install.sh
 ```
 
-`install.sh` now delegates straight to `bin/netreaper-install`. The repository root stays tidy while still exposing wrapper scripts (`./netreaper`, `./netreaper-install`) that mirror the system-wide binaries.
+The `install.sh` wrapper delegates to `bin/netreaper-install`, which handles tool installation, system-wide symlinks, and dependency management.
 
-### Install options
-
-```bash
-sudo ./netreaper-install essentials  # Core tools (~500MB) from the repo wrapper
-sudo ./netreaper-install all         # Everything (~3-5GB)
-sudo ./netreaper-install wireless    # WiFi arsenal
-sudo ./netreaper-install scanning    # Port scanners
-sudo ./netreaper-install exploit     # Exploitation tools
-sudo ./netreaper-install creds       # Password crackers
-sudo ./netreaper-install osint       # Reconnaissance
-```
-
-After installation these wrappers land in `/usr/local/bin/`, so `sudo netreaper-install ...` works everywhere without the leading `./`.
-
-**Works on:** Kali, Parrot, Ubuntu, Debian, Fedora, RHEL, Arch, Manjaro, openSUSE, Alpine
-
-## First 60 Seconds
-
-Running directly from the clone? Use `./netreaper` (wrapper) instead of `netreaper`. Both forward to the same `bin/` executable once installed.
+**Running locally (without install):**
 
 ```bash
-# 1. See what's installed and ready
-netreaper status
-
-# 2. Run a quick network scan
-sudo netreaper scan 192.168.1.0/24
-
-# 3. Check your logs
-ls ~/.netreaper/logs/
-
-# 4. Get help
-netreaper --help
+# Root wrappers in project root delegate to bin/
+./netreaper --help
+./netreaper-install --help
 ```
 
-## Non-Interactive & CI Mode
+---
 
-* NETREAPER treats `NR_NON_INTERACTIVE=1` or the absence of a TTY as a non-interactive session.
-* Wrapper scripts in the repo root (`./netreaper`, `./netreaper-install`) mirror the installed binaries so CI can keep invoking the historical `./netreaper ...` paths.
-* Simple prompts (`confirm`, `prompt_input`) use default values; dangerous operations are **blocked by default**.
+## Core Features
 
-### Authorization in Non-Interactive Mode
+- **70+ Tools Behind One CLI** — Nmap, Aircrack-ng, Metasploit, Hydra, and more, all accessible via unified commands
+- **Dry-Run Mode** — Preview commands without execution (`--dry-run`)
+- **Modular Architecture** — Separate bin, lib, and modules directories for clean organization
+- **Structured Logging & Audit Trail** — Daily log rotation with separate audit logs for compliance
+- **Safety & Authorization Model** — Target validation, protected IP ranges, and authorization prompts
+- **Non-Interactive / CI-Safe** — Explicit opt-in flags for automated pipelines
 
-Authorization does **not** auto-accept by default in non-interactive mode. To enable auto-authorization for CI pipelines:
+---
 
-```bash
-# Both flags are required for auto-authorization
-NR_AUTO_AUTHORIZE_NON_INTERACTIVE=1 NR_UNSAFE_MODE=1 ./netreaper scan 192.168.1.1
-```
-
-### Dangerous Operations in Non-Interactive Mode
-
-`confirm_dangerous()` blocks by default in non-interactive mode. To allow dangerous operations:
-
-```bash
-# Option 1: Enable unsafe mode (allows all dangerous ops)
-NR_NON_INTERACTIVE=1 NR_UNSAFE_MODE=1 ./netreaper scan 8.8.8.8
-
-# Option 2: Use NR_FORCE_DANGEROUS for specific scripts
-NR_NON_INTERACTIVE=1 NR_FORCE_DANGEROUS=1 ./netreaper scan 8.8.8.8
-```
-
-### Menu Selections in Non-Interactive Mode
-
-`select_option()` requires an explicit default index:
-
-```bash
-# Select option at index 0 (first option)
-NR_NON_INTERACTIVE=1 NR_NON_INTERACTIVE_DEFAULT_INDEX=0 ./netreaper
-```
-
-## Why NETREAPER?
-
-| Problem | NETREAPER Solution |
-|---------|-------------------|
-| 47 terminal windows, 20 tools, zero consistency | One entrypoint, unified logging, shared config |
-| Reinstalling your stack on every new machine | Single installer, reproducible setup for fleets |
-| Forgetting which flags work with which tool | Consistent interface, built-in presets |
-| Scattered output files everywhere | Organized session-based output in `~/.netreaper/` |
-
-## Logging System
-
-NETREAPER provides centralized logging with configurable levels and automatic file logging.
-
-### Log Levels
-
-Control verbosity with `NETREAPER_LOG_LEVEL`:
-
-```bash
-NETREAPER_LOG_LEVEL=0 netreaper status   # DEBUG: show everything
-NETREAPER_LOG_LEVEL=1 netreaper status   # INFO: default
-NETREAPER_LOG_LEVEL=4 netreaper status   # ERROR: errors only
-```
-
-| Level | Value | Shows |
-|-------|-------|-------|
-| DEBUG | 0 | Everything including debug messages |
-| INFO | 1 | Normal operation messages (default) |
-| SUCCESS | 2 | Success messages and above |
-| WARNING | 3 | Warnings and errors |
-| ERROR | 4 | Errors only |
-| FATAL | 5 | Fatal errors only |
-
-### File Logging
-
-Logs are written to two locations:
-
-* **Session log:** `~/.netreaper/logs/netreaper_YYYYMMDD.log` — all log messages
-* **Audit log:** `~/.netreaper/logs/audit_YYYYMMDD.log` — security-relevant operations only
-
-Disable file logging with `NETREAPER_FILE_LOGGING=0`:
-
-```bash
-NETREAPER_FILE_LOGGING=0 netreaper scan 192.168.1.1
-```
-
-### Log Functions
-
-| Function | Purpose |
-|----------|---------|
-| `log_debug` | Debug messages (level 0) |
-| `log_info` | Informational messages (level 1) |
-| `log_success` | Success messages (level 2) |
-| `log_warning` | Warning messages (level 3) |
-| `log_error` | Error messages (level 4) |
-| `log_fatal` | Fatal error messages (level 5) |
-| `log_audit` | Write to audit log regardless of level |
-
-## Privilege Handling
-
-NETREAPER provides smart privilege management with clear error messages.
-
-### Functions
-
-| Function | Purpose |
-|----------|---------|
-| `is_root` | Check if running as root (exit code only) |
-| `require_root` | Exit with error if not root |
-| `run_with_sudo` | Run a command with sudo if not already root |
-| `elevate_if_needed` | Re-exec the script with sudo if not root |
-| `can_get_root` | Check if sudo is available and user can elevate |
-
-### Non-Interactive Behavior
-
-In non-interactive mode (`NR_NON_INTERACTIVE=1`):
-* `require_root` exits immediately if not root (no prompt)
-* `run_with_sudo` attempts sudo without password prompt
-* `elevate_if_needed` fails gracefully if sudo requires a password
-
-```bash
-# Running as non-root in CI will fail cleanly instead of hanging
-NR_NON_INTERACTIVE=1 netreaper wifi monitor wlan0
-```
-
-## Target Validation & Safety
-
-NETREAPER validates all targets before operations to prevent accidental damage.
-
-### Validation System
-
-`validate_target()` performs:
-
-1. **Format validation:** IP address, CIDR range, or hostname
-2. **DNS resolution:** Hostnames are resolved to verify reachability
-3. **Public/Private detection:** Private RFC1918 addresses pass; public IPs trigger warnings
-4. **Protected IP blocking:** Loopback, multicast, broadcast, link-local, and reserved ranges are blocked
-
-### Public IP Confirmation
-
-When targeting a public IP, NETREAPER requires explicit confirmation:
-
-```bash
-$ netreaper scan 8.8.8.8
-[WARNING] Target 8.8.8.8 is a PUBLIC IP address
-[WARNING] Scanning public IPs may be illegal without authorization
-Type 'I HAVE PERMISSION' to confirm: I HAVE PERMISSION
-[INFO] Proceeding with scan...
-```
-
-### Unsafe Mode
-
-Bypass safety checks with `NR_UNSAFE_MODE`. Accepts: `1`, `true`, `yes`, `y` (case-insensitive):
-
-```bash
-# Skip all target validation and confirmations
-NR_UNSAFE_MODE=1 netreaper scan 8.8.8.8
-
-# Alternative truthy values
-NR_UNSAFE_MODE=true netreaper scan 8.8.8.8
-NR_UNSAFE_MODE=yes netreaper scan 8.8.8.8
-
-# Useful for scripting with known-safe targets
-NR_UNSAFE_MODE=1 netreaper scan 192.168.1.0/24
-```
-
-### Protected IP Ranges
-
-The following ranges are always blocked (even with `NR_UNSAFE_MODE`):
-
-* `127.0.0.0/8` — Loopback
-* `224.0.0.0/4` — Multicast
-* `255.255.255.255` — Broadcast
-* `169.254.0.0/16` — Link-local
-* `0.0.0.0/8` — Reserved
-
-## Confirmation System
-
-NETREAPER provides confirmation prompts for user interaction.
-
-### Functions
-
-| Function | Purpose |
-|----------|---------|
-| `confirm` | Yes/no prompt, returns 0 for yes |
-| `confirm_dangerous` | Requires typing a keyword to confirm |
-| `prompt_input` | Prompt for text input with optional validation |
-| `select_option` | Display numbered menu and get selection |
-
-### Examples
-
-```bash
-# Simple yes/no (default: no)
-if confirm "Proceed with scan?"; then
-    run_scan
-fi
-
-# Dangerous operation requiring keyword
-if confirm_dangerous "Delete all captures?" "DELETE"; then
-    rm -rf "$CAPTURE_DIR"/*
-fi
-```
-
-### Non-Interactive Mode
-
-All confirmation functions respect `NR_NON_INTERACTIVE`:
-
-* `confirm` — Returns the default value (configurable)
-* `confirm_dangerous` — **Blocked by default**; auto-accepts only if `NR_UNSAFE_MODE` or `NR_FORCE_DANGEROUS` is set
-* `prompt_input` — Returns default or empty string
-* `select_option` — Requires `NR_NON_INTERACTIVE_DEFAULT_INDEX` to be set; fails otherwise
-
-## Dry-Run Mode
-
-Preview what commands would run without executing:
-
-```bash
-netreaper --dry-run scan 192.168.1.0/24
-sudo netreaper --dry-run wifi monitor wlan0
-```
-
-All commands print with `[DRY-RUN]` prefix instead of executing. Safe to test.
-
-## Shell Completions
-
-NETREAPER ships shell completions in `completions/`—copy them into your shell's completion path and reload.
-
-### Bash
-
-```bash
-sudo cp completions/netreaper.bash /etc/bash_completion.d/netreaper
-source /etc/bash_completion
-```
-
-### Zsh
-
-```bash
-mkdir -p ~/.zsh/completions
-cp completions/netreaper.zsh ~/.zsh/completions/_netreaper
-echo 'fpath=(~/.zsh/completions $fpath)' >> ~/.zshrc
-autoload -U compinit && compinit
-```
-
-### Fish
-
-```bash
-mkdir -p ~/.config/fish/completions
-cp completions/netreaper.fish ~/.config/fish/completions/netreaper.fish
-```
-
-## Usage
-
-```bash
-sudo netreaper                      # Interactive menu
-sudo netreaper scan 192.168.1.0/24  # Scan subnet
-sudo netreaper wifi monitor wlan0   # Enable monitor mode
-sudo netreaper wizard scan          # Guided wizard
-sudo netreaper status               # Show tool status
-netreaper --help                    # Full help
-netreaper config path               # Show config directory
-```
-
-### Advanced Examples
-
-```bash
-# Preview scan without executing
-netreaper --dry-run scan 10.0.0.0/24
-
-# Scan public IP with confirmation
-sudo netreaper scan 203.0.113.1
-# Type 'I HAVE PERMISSION' when prompted
-
-# Bypass safety for scripting (accepts 1, true, yes, y)
-NR_UNSAFE_MODE=1 sudo netreaper scan 192.168.1.0/24
-NR_UNSAFE_MODE=true sudo netreaper scan 192.168.1.0/24
-
-# Debug output with file logging disabled
-NETREAPER_LOG_LEVEL=0 NETREAPER_FILE_LOGGING=0 netreaper status
-
-# CI/headless with full auto-authorization (dangerous operations allowed)
-NR_NON_INTERACTIVE=1 NR_UNSAFE_MODE=1 NR_AUTO_AUTHORIZE_NON_INTERACTIVE=1 \
-    sudo netreaper scan 192.168.1.1
-
-# CI/headless with menu selection (select first option)
-NR_NON_INTERACTIVE=1 NR_NON_INTERACTIVE_DEFAULT_INDEX=0 netreaper
-
-# Force dangerous operations in non-interactive mode
-NR_NON_INTERACTIVE=1 NR_FORCE_DANGEROUS=1 sudo netreaper scan 8.8.8.8
-```
-
-## What's In It
-
-| Category | Tools |
-|----------|-------|
-| Recon | nmap, masscan, rustscan, netdiscover, dnsenum, sslscan |
-| Wireless | aircrack-ng, wifite, bettercap, reaver, hcxdumptool, mdk4 |
-| Exploit | metasploit, sqlmap, nikto, gobuster, nuclei, wpscan |
-| Creds | hashcat, john, hydra, medusa, crackmapexec |
-| Traffic | tcpdump, wireshark, tshark, hping3, iperf3 |
-| OSINT | theharvester, recon-ng, shodan, amass, subfinder |
-
-Plus 40+ more. Run `netreaper status` for the full list.
-
-## Testing & QA
-
-* `tests/smoke/test_help.sh` and `tests/smoke/test_version.sh` exercise the wrapper binaries exactly how CI calls them.
-* Set `NR_NON_INTERACTIVE=1` (or rely on the default TTY detection) so the wizard and legal prompts are skipped automatically.
-* Full Bats coverage still lives under `tests/*.bats` for module-level validation.
-
-```bash
-chmod +x tests/smoke/*.sh
-NR_NON_INTERACTIVE=1 tests/smoke/test_help.sh
-NR_NON_INTERACTIVE=1 tests/smoke/test_version.sh
-bats tests/*.bats
-```
-
-## Architecture
+## Architecture Overview
 
 ```
 NETREAPER/
 ├── netreaper              # Root wrapper → bin/netreaper
 ├── netreaper-install      # Root wrapper → bin/netreaper-install
+├── install.sh             # Installer wrapper → bin/netreaper-install
+├── VERSION                # Single source of truth for version
 ├── bin/
-│   ├── netreaper              # Thin dispatcher (sources libs, routes commands)
-│   └── netreaper-install      # Arsenal installer
+│   ├── netreaper          # Main CLI dispatcher
+│   └── netreaper-install  # Tool installer
 ├── lib/
-│   ├── version.sh             # VERSION + NETREAPER_ROOT (single source of truth)
-│   ├── core.sh                # Logging, colors, paths, sudo helpers, error handling
-│   ├── ui.sh                  # Banners, menus, confirmation prompts, input validators
-│   ├── safety.sh              # Target validation (IP/CIDR/hostname, public/private)
-│   ├── detection.sh           # Distro and package manager detection
-│   └── utils.sh               # File operations, tool checks, helpers
+│   ├── version.sh         # NETREAPER_ROOT + VERSION resolution
+│   ├── core.sh            # Logging, paths, directories, error handling, sudo helpers
+│   ├── ui.sh              # Banners, menus, prompts, confirmations
+│   ├── safety.sh          # Target validation, authorization, unsafe mode
+│   ├── detection.sh       # Distro, package manager, tool, interface detection
+│   └── utils.sh           # Timestamps, backups, safe file operations, tool execution
 ├── modules/
-│   ├── recon.sh               # Network reconnaissance
-│   ├── wireless.sh            # WiFi operations
-│   ├── scanning.sh            # Port scanning
-│   ├── exploit.sh             # Exploitation tools
-│   ├── credentials.sh         # Password cracking
-│   ├── traffic.sh             # Packet analysis
-│   └── osint.sh               # OSINT gathering
-├── tests/
-│   ├── smoke/                 # Quick validation tests
-│   └── *.bats                 # Full test suite
-├── docs/                      # Documentation set
-├── completions/               # Shell completions (bash, fish, zsh)
-├── VERSION                    # Version number (read by lib/version.sh)
-└── install.sh                 # Wrapper installer (delegates to bin/)
+│   ├── recon.sh           # Reconnaissance tools
+│   ├── scanning.sh        # Port scanning, service enumeration
+│   ├── wireless.sh        # WiFi attacks, monitor mode, handshake capture
+│   ├── exploit.sh         # Exploitation frameworks
+│   ├── credentials.sh     # Password attacks, hash cracking
+│   ├── traffic.sh         # Traffic analysis, MITM
+│   ├── osint.sh           # Open source intelligence
+│   └── stress.sh          # Stress testing, DoS simulation
+├── docs/                  # Documentation (HOWTO, QUICKREF, etc.)
+└── tests/                 # Test suites (bats, smoke tests)
 ```
 
-### Library Responsibilities
+### Library Descriptions
 
-| Library | Purpose |
-|---------|---------|
-| `version.sh` | Exports `VERSION` and `NETREAPER_ROOT`; sourced first |
-| `core.sh` | Logging (`log_*`), colors, exit codes, error handling (`die`, `assert`, `try`), sudo helpers |
-| `ui.sh` | Banners, menus, `confirm()`, `confirm_dangerous()`, `prompt_input()`, `select_option()`, input validators |
-| `safety.sh` | `validate_target()`, IP/CIDR validation, public IP warnings, authorization checks |
-| `detection.sh` | `detect_system()`, distro family detection, package manager selection |
-| `utils.sh` | `safe_rm()`, `safe_mkdir()`, `safe_copy()`, `safe_move()`, tool path helpers |
-
-### Environment Variables
-
-| Variable | Purpose | Default |
-|----------|---------|---------|
-| `NR_UNSAFE_MODE` | Bypass target validation and dangerous op gates (accepts: `1`, `true`, `yes`, `y`) | `0` |
-| `NR_NON_INTERACTIVE` | Skip interactive prompts, use defaults | `0` |
-| `NR_DRY_RUN` | Preview commands without executing | `0` |
-| `NR_FORCE_DANGEROUS` | Auto-accept `confirm_dangerous()` in non-interactive mode | `0` |
-| `NR_AUTO_AUTHORIZE_NON_INTERACTIVE` | Allow auto-authorization in non-interactive mode (requires `NR_UNSAFE_MODE`) | `0` |
-| `NR_NON_INTERACTIVE_DEFAULT_INDEX` | Default option index (0-based) for `select_option()` in non-interactive mode | unset |
-| `NETREAPER_LOG_LEVEL` | Minimum log level (0-5) | `1` (INFO) |
-| `NETREAPER_FILE_LOGGING` | Enable file logging | `1` |
-
-## What It Does
-
-* Wraps dozens of tools with unified logging/output.
-* Organizes everything under `~/.netreaper/` per session.
-* Validates targets and blocks obviously dangerous operations by default.
-* Logs each command in timestamped audit trails (`~/.netreaper/logs/audit_*.log`).
-* Centralized logging system with configurable log levels (DEBUG–FATAL).
-* Smart privilege handling with clear error messages when root is required.
-* Detects your distro and runs the appropriate package manager.
-
-## What It Doesn't Do
-
-* Replace your knowledge of the underlying tools.
-* Give you permission to test things you don't own.
-* Make unauthorized access legal.
-
-## Project History
-
-NETREAPER has been in active development and private use since early 2025 as an internal penetration testing toolkit. The public GitHub repository was created on December 9, 2025 after an OS reflash; prior commit history exists only in local backups. Expect rapid iteration until the v6.x module-based architecture fully stabilizes.
-
-## Legal
-
-Apache License 2.0 — see `LICENSE`. Authorized testing only; you need written permission for any system you test. You are responsible for your actions. No EULA. No additional terms.
-
-## Support
-
-If NETREAPER saves you time, consider sponsoring or opening a discussion/issue for feedback.
+| File | Purpose |
+|------|---------|
+| `version.sh` | Resolves `NETREAPER_ROOT` and reads `VERSION` file; prevents version drift |
+| `core.sh` | Logging system, color definitions, directory setup, exit codes, privilege handling, dry-run wrappers, error framework (`die`, `try`, `require_tool`) |
+| `ui.sh` | Banner display, input sanitization, prompts (`confirm`, `confirm_dangerous`, `select_option`), progress indicators |
+| `safety.sh` | IP validation, CIDR matching, protected ranges, `validate_target()`, authorization checks, unsafe mode |
+| `detection.sh` | Distro detection, package manager setup, tool checks, wireless interface detection |
+| `utils.sh` | Timestamps, file backups, cleanup handlers, safe file operations (`safe_rm`, `safe_copy`, `safe_move`), tool execution wrappers |
 
 ---
 
-© 2025 OFFTRACKMEDIA Studios — Apache 2.0
+## Logging System
+
+NETREAPER provides structured logging with six severity levels:
+
+| Level | Function | Symbol | Use Case |
+|-------|----------|--------|----------|
+| DEBUG | `log_debug()` | `~` | Detailed diagnostic information |
+| INFO | `log_info()` | `*` | General operational messages |
+| SUCCESS | `log_success()` | `✓` | Successful operations |
+| WARNING | `log_warning()` | `!` | Potential issues, cautions |
+| ERROR | `log_error()` | `✗` | Errors that don't halt execution |
+| FATAL | `log_fatal()` | `☠` | Critical errors that exit immediately |
+
+### Log File Locations
+
+```
+~/.netreaper/logs/netreaper_YYYYMMDD.log   # Operation logs (daily rotation)
+~/.netreaper/logs/audit_YYYYMMDD.log       # Audit trail (actions, targets, results)
+```
+
+### Logging Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NETREAPER_LOG_LEVEL` | `1` (INFO) | Minimum level to log (0=DEBUG, 1=INFO, 2=SUCCESS, 3=WARNING, 4=ERROR, 5=FATAL) |
+| `NETREAPER_FILE_LOGGING` | `1` | Enable file logging (`0` to disable) |
+
+### Audit Logging
+
+All significant actions are recorded via `log_audit()`:
+
+```
+[2025-01-15 14:30:22] USER=root ACTION=SCAN TARGET="192.168.1.1" RESULT="success" PID=12345
+```
+
+---
+
+## Privilege & Sudo Handling
+
+NETREAPER provides several functions for managing root privileges:
+
+| Function | Description |
+|----------|-------------|
+| `is_root()` | Returns 0 if running as root (EUID=0) |
+| `require_root()` | Logs error and returns 1 if not root; provides hint to re-run with sudo |
+| `run_with_sudo()` | Executes command with `sudo` if not already root |
+| `elevate_if_needed()` | Prompts user to elevate privileges; re-execs script as root if approved |
+| `can_get_root()` | Checks if root access is possible (already root, passwordless sudo, or TTY available) |
+
+**Operations requiring root** (defined in `ROOT_OPS` array):
+- `wifi`, `scan`, `stress`, `exploit`, `traffic`, `sniff`, `mitm`, `capture`, `inject`
+
+**Non-interactive behavior:**
+- `elevate_if_needed()` returns error if `NR_NON_INTERACTIVE=1` or no TTY
+- Use `sudo` explicitly in CI pipelines
+
+---
+
+## Safety & Target Validation
+
+### validate_target()
+
+The `validate_target()` function is the primary safety gate for all operations:
+
+1. **Accepts:** IP address, CIDR notation, or hostname
+2. **Resolves hostnames** to IP addresses (via `dig`, `host`, or `getent`)
+3. **Checks protected ranges** — Blocks loopback, link-local, multicast, broadcast, reserved
+4. **Detects private vs public IPs** — Warns and requires confirmation for public targets
+
+### Protected Ranges
+
+The `DEFAULT_PROTECTED_RANGES` array blocks these CIDR ranges:
+
+| Range | Description |
+|-------|-------------|
+| `127.0.0.0/8` | Loopback |
+| `169.254.0.0/16` | Link-local |
+| `224.0.0.0/4` | Multicast |
+| `240.0.0.0/4` | Reserved |
+| `255.255.255.255/32` | Broadcast |
+| `0.0.0.0/8` | Current network |
+
+### Validation Functions
+
+| Function | Description |
+|----------|-------------|
+| `is_valid_ip()` | Validates IPv4 address format (each octet 0-255) |
+| `is_valid_cidr()` | Validates CIDR notation (IP + prefix 0-32) |
+| `is_private_ip()` | Checks if IP is RFC1918 private (10.x, 172.16-31.x, 192.168.x) |
+| `is_protected_ip()` | Checks if IP falls within any `DEFAULT_PROTECTED_RANGES` |
+| `is_dangerous_range()` | Blocks broad ranges like `0.0.0.0/0` or `/0` prefixes |
+
+### Public IP Behavior
+
+- **Normal mode:** Warns user and requires `confirm_dangerous()` confirmation
+- **Unsafe mode:** Allows with logging; no confirmation required
+
+---
+
+## Dangerous Operations & Confirmations
+
+### Confirmation Functions
+
+| Function | Description |
+|----------|-------------|
+| `confirm()` | Simple yes/no confirmation with default; returns 0 (yes) or 1 (no) |
+| `confirm_dangerous()` | Requires typing exact phrase (e.g., "YES") to proceed; displays warning banner |
+| `prompt_input()` | Collects input with optional validator and secret mode (hidden input) |
+| `select_option()` | Displays numbered menu; returns selected option |
+
+### Interactive Mode Behavior
+
+```bash
+# confirm() example
+confirm "Continue with scan?" "n"  # Default: no
+
+# confirm_dangerous() example — requires typing exact phrase
+confirm_dangerous "Delete all logs?" "DELETE"
+```
+
+### Non-Interactive Mode Behavior
+
+| Function | Default Behavior | Override |
+|----------|------------------|----------|
+| `confirm()` | Uses default value | N/A |
+| `confirm_dangerous()` | **Blocked** (returns 1) | `NR_UNSAFE_MODE=1` or `NR_FORCE_DANGEROUS=1` |
+| `select_option()` | **Fails** (returns 1) | Set `NR_NON_INTERACTIVE_DEFAULT_INDEX=N` |
+| `prompt_input()` | Returns default value | N/A |
+
+---
+
+## Non-Interactive & CI Mode
+
+NETREAPER detects non-interactive mode when:
+- `NR_NON_INTERACTIVE=1` is set, OR
+- No TTY is attached (`[[ ! -t 0 ]]`)
+
+### Behavior Matrix
+
+| Function | Interactive | Non-Interactive (default) | Non-Interactive + Unsafe Mode |
+|----------|-------------|---------------------------|-------------------------------|
+| `check_authorization()` | Prompts for "I AM AUTHORIZED" | **Blocked** | Allowed with `NR_AUTO_AUTHORIZE_NON_INTERACTIVE=1` |
+| `confirm_dangerous()` | Prompts for exact phrase | **Blocked** | Auto-accepts |
+| `select_option()` | Shows menu, waits for input | **Fails** | Uses `NR_NON_INTERACTIVE_DEFAULT_INDEX` |
+| `confirm()` | Prompts y/n | Uses default | Uses default |
+| `elevate_if_needed()` | Prompts for elevation | **Fails** | **Fails** (use explicit sudo) |
+
+### Enabling Dangerous Operations in CI
+
+```bash
+# Full unsafe mode — bypasses all safety checks
+export NR_UNSAFE_MODE=1
+export NR_NON_INTERACTIVE=1
+export NR_AUTO_AUTHORIZE_NON_INTERACTIVE=1
+netreaper scan 192.168.1.1
+
+# Allow only dangerous confirmations (without full unsafe mode)
+export NR_NON_INTERACTIVE=1
+export NR_FORCE_DANGEROUS=1
+netreaper scan 192.168.1.1
+
+# Menu selection in non-interactive mode
+export NR_NON_INTERACTIVE=1
+export NR_NON_INTERACTIVE_DEFAULT_INDEX=0  # Select first option (0-based)
+netreaper wizard scan
+```
+
+---
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `NETREAPER_LOG_LEVEL` | `1` | Log level: 0=DEBUG, 1=INFO, 2=SUCCESS, 3=WARNING, 4=ERROR, 5=FATAL |
+| `NETREAPER_FILE_LOGGING` | `1` | Enable file logging (`0` to disable) |
+| `NR_NON_INTERACTIVE` | `0` | Force non-interactive mode (`1` to enable) |
+| `NR_UNSAFE_MODE` | `0` | Bypass safety checks; accepts `1`, `true`, `yes`, `y` |
+| `NR_FORCE_DANGEROUS` | `0` | Allow `confirm_dangerous()` in non-interactive mode without full unsafe mode |
+| `NR_AUTO_AUTHORIZE_NON_INTERACTIVE` | `0` | Auto-authorize in non-interactive mode (requires `NR_UNSAFE_MODE=1`) |
+| `NR_NON_INTERACTIVE_DEFAULT_INDEX` | (unset) | 0-based index for `select_option()` in non-interactive mode |
+| `NR_DRY_RUN` | `0` | Print commands instead of executing (`1` to enable) |
+| `NO_COLOR` | `0` | Disable colored output (`1` to enable) |
+| `DEBUG` | `false` | Enable debug output (`true` to enable) |
+| `VERBOSE` | `false` | Enable verbose output (`true` to enable) |
+| `QUIET` | `false` | Suppress non-error console output (`true` to enable) |
+
+---
+
+## CLI Usage Examples
+
+```bash
+# Show help
+netreaper --help
+netreaper help
+
+# Show version (reads from VERSION file)
+netreaper --version
+
+# Check tool status
+netreaper status
+netreaper status --compact
+
+# Dry-run mode — preview commands without execution
+netreaper --dry-run scan 192.168.1.1
+
+# Quick scan
+netreaper scan 192.168.1.1
+
+# Full scan (requires root)
+sudo netreaper scan 192.168.1.1 --full
+
+# WiFi menu (requires root)
+sudo netreaper wifi
+
+# Interactive wizard
+netreaper wizard scan
+
+# Configuration
+netreaper config path
+netreaper config edit
+
+# Non-interactive CI example
+NR_NON_INTERACTIVE=1 netreaper status
+
+# Unsafe mode for automated testing
+NR_NON_INTERACTIVE=1 NR_UNSAFE_MODE=1 NR_AUTO_AUTHORIZE_NON_INTERACTIVE=1 \
+  sudo netreaper scan 192.168.1.0/24
+
+# Force dangerous confirmation in CI (without full unsafe mode)
+NR_NON_INTERACTIVE=1 NR_FORCE_DANGEROUS=1 \
+  sudo netreaper stress 192.168.1.1
+
+# Menu selection in CI
+NR_NON_INTERACTIVE=1 NR_NON_INTERACTIVE_DEFAULT_INDEX=0 \
+  netreaper wizard scan
+```
+
+---
+
+## Testing & QA
+
+### Running Tests
+
+```bash
+# BATS tests (requires bats-core)
+NR_NON_INTERACTIVE=1 bats tests/*.bats
+
+# Smoke tests
+./tests/smoke/test_help.sh
+./tests/smoke/test_version.sh
+```
+
+### Test Coverage
+
+| Test File | Coverage |
+|-----------|----------|
+| `tests/cli.bats` | CLI flags, commands, exit codes |
+| `tests/help.bats` | Help output validation |
+| `tests/syntax.bats` | Shell syntax checking |
+| `tests/detection.bats` | System/distro detection |
+| `tests/smoke/*.sh` | Quick smoke tests for CI |
+
+---
+
+## Legal & License
+
+```
+Copyright (c) 2025 OFFTRACKMEDIA Studios (ABN: 84 290 819 896)
+SPDX-License-Identifier: Apache-2.0
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
+
+### Authorized Testing Only
+
+**NETREAPER is designed for authorized security testing only.**
+
+By using this software, you acknowledge that:
+
+- You have **written authorization** to test target systems
+- You accept **full legal responsibility** for your actions
+- Unauthorized access to computer systems is a **federal crime**
+
+The authors and contributors are not responsible for misuse of this software.
+
+---
+
+## Project History
+
+NETREAPER began as a personal toolkit for streamlining penetration testing workflows. What started as a collection of wrapper scripts evolved into a full-featured framework with:
+
+- **Phase 1:** Core refactoring — Modular lib/bin/modules architecture, centralized version handling
+- **Phase 2:** Safety & confirmations — Target validation, authorization model, non-interactive CI support
+
+The project follows a "batteries included" philosophy: one CLI to rule all your security tools, with safety guardrails that don't get in your way.
+
+---
+
+## Support
+
+- **Issues:** [GitHub Issues](https://github.com/OFFTRACKMEDIA/NETREAPER/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/OFFTRACKMEDIA/NETREAPER/discussions)
+- **Documentation:** See `docs/` directory for HOWTO, QUICKREF, and TROUBLESHOOTING guides
+
+---
+
+<p align="center">
+  <strong>NETREAPER</strong> — "Some tools scan. Some tools attack. I do both."
+</p>
+<p align="center">
+  © 2025 OFFTRACKMEDIA Studios
+</p>
