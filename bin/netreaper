@@ -11,6 +11,16 @@
 set -euo pipefail
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# PRE-INIT: Suppress output for config get (must be set before sourcing libs)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# For "config get <key>", suppress ALL output (logs, init messages) so that
+# only the raw value is printed to stdout. This ensures BATS tests pass.
+if [[ "${1:-}" == "config" && "${2:-}" == "get" && -n "${3:-}" ]]; then
+    export NR_SUPPRESS_OUTPUT=1
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # SOURCE LIBRARIES
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -217,7 +227,8 @@ main() {
                         log_error "Key not found: $3"
                         exit 1
                     }
-                    echo "$value"
+                    # Output raw value only - no formatting, colors, or prefix
+                    printf '%s\n' "$value"
                     exit 0
                     ;;
                 set)

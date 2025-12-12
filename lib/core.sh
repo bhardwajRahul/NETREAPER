@@ -287,6 +287,10 @@ _log() {
     local timestamp
     timestamp=$(date '+%Y-%m-%d %H:%M:%S')
 
+    # Suppress all console/stderr output when NR_SUPPRESS_OUTPUT is set
+    # File logging is also suppressed for simplicity in CI/test contexts
+    [[ "${NR_SUPPRESS_OUTPUT:-0}" == "1" ]] && return 0
+
     # Check log level threshold
     [[ $level_num -lt $CURRENT_LOG_LEVEL ]] && return 0
 

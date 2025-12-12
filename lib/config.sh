@@ -34,6 +34,7 @@ readonly _NETREAPER_CONFIG_LOADED=1
 # Graceful logging fallback if logging functions aren't available yet
 # These will be overridden once core.sh is loaded
 _config_log_info() {
+    [[ "${NR_SUPPRESS_OUTPUT:-0}" == "1" ]] && return 0
     if declare -f log_info &>/dev/null; then
         log_info "$@"
     else
@@ -42,6 +43,7 @@ _config_log_info() {
 }
 
 _config_log_error() {
+    [[ "${NR_SUPPRESS_OUTPUT:-0}" == "1" ]] && return 0
     if declare -f log_error &>/dev/null; then
         log_error "$@"
     else
@@ -50,6 +52,7 @@ _config_log_error() {
 }
 
 _config_log_success() {
+    [[ "${NR_SUPPRESS_OUTPUT:-0}" == "1" ]] && return 0
     if declare -f log_success &>/dev/null; then
         log_success "$@"
     else
@@ -58,6 +61,7 @@ _config_log_success() {
 }
 
 _config_log_debug() {
+    [[ "${NR_SUPPRESS_OUTPUT:-0}" == "1" ]] && return 0
     if declare -f log_debug &>/dev/null; then
         log_debug "$@"
     else
