@@ -352,18 +352,28 @@ check_tool_installed() {
 }
 
 # Enhanced tool verification - checks binary exists, not just exit code
+# Args: $1 = tool name, $2 = binary name (optional, defaults to tool)
+# Returns: 0 if tool is installed, 1 otherwise
 verify_tool_installed() {
     local tool="$1"
     local binary="${2:-$tool}"
 
-    # Check if command exists
+    # Reject empty input
+    if [[ -z "$tool" ]]; then
+        return 1
+    fi
+
+    # Check if command exists via PATH
     if command -v "$binary" &>/dev/null; then
         return 0
     fi
 
-    # Check common binary locations
-    for path in /usr/bin /usr/local/bin /usr/sbin /sbin ~/.local/bin ~/go/bin /opt; do
-        if [[ -x "$path/$binary" ]]; then
+    # Check all directories in TOOL_SEARCH_PATHS
+    local search_path
+    for search_path in $TOOL_SEARCH_PATHS; do
+        # Expand ~ and $HOME in path
+        search_path="${search_path/#\~/$HOME}"
+        if [[ -x "$search_path/$binary" ]]; then
             return 0
         fi
     done
@@ -381,6 +391,12 @@ verify_tool_installed() {
             ;;
         theharvester)
             command -v theHarvester &>/dev/null && return 0
+            ;;
+        shodan|slowloris)
+            # Check pip3-installed tools
+            if command -v pip3 &>/dev/null; then
+                pip3 show "$tool" &>/dev/null && return 0
+            fi
             ;;
     esac
 
@@ -458,13 +474,23 @@ pkg_update() {
 }
 
 # Install a tool with fallback methods
+# Args: $1 = tool name, $2 = binary name (optional, defaults to tool)
+# Returns: 0 on success or already installed, 1 on failure
+# Side effects: Updates SUCCESS_TOOLS, SKIPPED_TOOLS, or FAILED_TOOLS arrays
+# IMPORTANT: This function MUST NOT exit the script on failure
 install_tool() {
     local tool="$1"
     local binary="${2:-$tool}"
 
-    # Already installed?
+    # Reject empty input
+    if [[ -z "$tool" ]]; then
+        return 1
+    fi
+
+    # Already installed? -> SKIPPED_TOOLS
     if check_tool_installed "$tool" "$binary"; then
         echo -e "    ${C_GREEN}✓${C_RESET} $tool ${C_SHADOW}(installed)${C_RESET}"
+        SKIPPED_TOOLS+=("$tool")
         return 0
     fi
 
@@ -479,6 +505,7 @@ install_tool() {
         if pkg_install "$package"; then
             if check_tool_installed "$tool" "$binary"; then
                 echo -e "\r    ${C_GREEN}✓${C_RESET} $tool                    "
+                SUCCESS_TOOLS+=("$tool")
                 return 0
             fi
         fi
@@ -490,6 +517,7 @@ install_tool() {
            pip3 install "$tool" --user &>/dev/null 2>&1; then
             if check_tool_installed "$tool" "$binary"; then
                 echo -e "\r    ${C_GREEN}✓${C_RESET} $tool ${C_SHADOW}(pip)${C_RESET}          "
+                SUCCESS_TOOLS+=("$tool")
                 return 0
             fi
         fi
@@ -517,6 +545,7 @@ install_tool() {
 
         if check_tool_installed "$tool" "$binary"; then
             echo -e "\r    ${C_GREEN}✓${C_RESET} $tool ${C_SHADOW}(go)${C_RESET}           "
+            SUCCESS_TOOLS+=("$tool")
             return 0
         fi
     fi
@@ -524,12 +553,13 @@ install_tool() {
     # Method 4: GitHub release
     if install_from_github "$tool"; then
         echo -e "\r    ${C_GREEN}✓${C_RESET} $tool ${C_SHADOW}(github)${C_RESET}       "
+        SUCCESS_TOOLS+=("$tool")
         return 0
     fi
 
-    # All methods failed - add to FAILED_TOOLS array
+    # All methods failed - add to FAILED_TOOLS with package info
     echo -e "\r    ${C_RED}✗${C_RESET} $tool ${C_SHADOW}(unavailable for $DISTRO)${C_RESET}"
-    FAILED_TOOLS+=("$tool")
+    FAILED_TOOLS+=("$tool:${package:-unknown}")
     return 1
 }
 
@@ -711,13 +741,18 @@ log_error()   { echo -e "    ${C_RED}[✗]${C_RESET} $*"; }
 log_verbose() { [[ -n "${VERBOSE:-}" ]] && echo -e "    ${C_SHADOW}[-]${C_RESET} $*"; }
 
 # Global tracking
+declare -a SUCCESS_TOOLS=()
 declare -a FAILED_TOOLS=()
 declare -a SKIPPED_TOOLS=()
 declare -a INSTALL_ATTEMPTED=()
+declare -a ALL_SUCCESS_TOOLS=()
 declare -a ALL_FAILED_TOOLS=()
 declare -a ALL_SKIPPED_TOOLS=()
 declare -a ALL_INSTALL_ATTEMPTED=()
 INSTALL_ERRORS=0
+
+# Tool search paths (comprehensive list for verification)
+readonly TOOL_SEARCH_PATHS="/usr/bin /usr/local/bin /usr/sbin /usr/local/sbin /sbin /bin /opt/bin $HOME/.local/bin $HOME/go/bin"
 
 # Tool installation hints for failed tools (shown in summary)
 declare -A TOOL_INSTALL_HINTS=(
@@ -1447,11 +1482,13 @@ show_install_summary() {
     echo -e "    ${C_CYAN}═══════════════════════════════════════════════════════════════${C_RESET}"
     echo
 
-    local total_attempted=${#INSTALL_ATTEMPTED[@]}
+    local total_success=${#SUCCESS_TOOLS[@]}
+    local total_skipped=${#SKIPPED_TOOLS[@]}
     local total_failed=${#FAILED_TOOLS[@]}
-    local total_success=$((total_attempted - total_failed))
+    local total_attempted=${#INSTALL_ATTEMPTED[@]}
 
-    echo -e "    ${C_GREEN}✓${C_RESET} Successful: ${C_GREEN}${total_success}${C_RESET}"
+    echo -e "    ${C_GREEN}✓${C_RESET} Installed:  ${C_GREEN}${total_success}${C_RESET}"
+    echo -e "    ${C_SHADOW}○${C_RESET} Skipped:    ${C_SHADOW}${total_skipped}${C_RESET} ${C_SHADOW}(already installed)${C_RESET}"
     echo -e "    ${C_RED}✗${C_RESET} Failed:     ${C_RED}${total_failed}${C_RESET}"
     echo
 
@@ -1558,6 +1595,7 @@ install_category() {
     echo
     echo -e "    ${C_CYAN}━━━ Installing ${category^^} tools ━━━${C_RESET}"
 
+    SUCCESS_TOOLS=()
     FAILED_TOOLS=()
     SKIPPED_TOOLS=()
     INSTALL_ATTEMPTED=()
@@ -1567,6 +1605,7 @@ install_category() {
         install_tool "$tool" || true
     done
 
+    ALL_SUCCESS_TOOLS+=("${SUCCESS_TOOLS[@]}")
     ALL_FAILED_TOOLS+=("${FAILED_TOOLS[@]}")
     ALL_SKIPPED_TOOLS+=("${SKIPPED_TOOLS[@]}")
     ALL_INSTALL_ATTEMPTED+=("${INSTALL_ATTEMPTED[@]}")
@@ -1579,20 +1618,24 @@ install_category() {
 }
 
 install_all() {
+    local all_success=()
     local all_failed=()
     local all_skipped=()
     local all_attempted=()
 
     for category in scanning wireless web exploit osint creds traffic; do
         install_category "$category" || true
+        all_success+=("${SUCCESS_TOOLS[@]}")
         all_failed+=("${FAILED_TOOLS[@]}")
         all_skipped+=("${SKIPPED_TOOLS[@]}")
         all_attempted+=("${INSTALL_ATTEMPTED[@]}")
+        SUCCESS_TOOLS=()
         FAILED_TOOLS=()
         SKIPPED_TOOLS=()
         INSTALL_ATTEMPTED=()
     done
 
+    SUCCESS_TOOLS=("${all_success[@]}")
     FAILED_TOOLS=("${all_failed[@]}")
     SKIPPED_TOOLS=("${all_skipped[@]}")
     INSTALL_ATTEMPTED=("${all_attempted[@]}")

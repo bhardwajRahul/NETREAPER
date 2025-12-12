@@ -791,6 +791,180 @@ elapsed_time() {
 }
 
 #═══════════════════════════════════════════════════════════════════════════════
+# WORDLIST MANAGEMENT
+#═══════════════════════════════════════════════════════════════════════════════
+
+# Wordlist search paths
+declare -ga WORDLIST_PATHS=(
+    "/usr/share/wordlists"
+    "/usr/share/seclists"
+    "$HOME/wordlists"
+)
+
+# Known wordlists mapping
+declare -gA KNOWN_WORDLISTS=(
+    [rockyou]="/usr/share/wordlists/rockyou.txt"
+    [common]="/usr/share/seclists/Passwords/Common-Credentials/10-million-password-list-top-1000000.txt"
+)
+
+# check_wordlists() - Display status of known wordlists
+# Returns: 0 always (status report), 1 if KNOWN_WORDLISTS is empty
+check_wordlists() {
+    log_info "Checking wordlists..."
+
+    # Warn if no wordlists defined
+    if [[ ${#KNOWN_WORDLISTS[@]} -eq 0 ]]; then
+        log_warning "No known wordlists defined"
+        return 1
+    fi
+
+    local name path
+    for name in "${!KNOWN_WORDLISTS[@]}"; do
+        path="${KNOWN_WORDLISTS[$name]}"
+
+        if [[ -f "$path" ]]; then
+            # File exists
+            echo -e "    ${C_GREEN}✓${C_RESET} $name: $path"
+        elif [[ -f "${path}.gz" ]]; then
+            # Compressed version exists
+            echo -e "    ${C_YELLOW}○${C_RESET} $name: ${path}.gz ${C_SHADOW}(compressed)${C_RESET}"
+        else
+            # Not found
+            echo -e "    ${C_RED}✗${C_RESET} $name: NOT FOUND"
+        fi
+    done
+
+    return 0
+}
+
+# ensure_rockyou() - Ensure rockyou.txt is available
+# Outputs: path to rockyou.txt on success
+# Returns: 0 on success, 1 on failure
+ensure_rockyou() {
+    local rockyou_path="/usr/share/wordlists/rockyou.txt"
+    local rockyou_gz="${rockyou_path}.gz"
+
+    # Already exists?
+    if [[ -f "$rockyou_path" ]]; then
+        echo "$rockyou_path"
+        return 0
+    fi
+
+    # Compressed version exists?
+    if [[ -f "$rockyou_gz" ]]; then
+        log_info "Decompressing rockyou.txt.gz..."
+        if run_with_sudo gunzip -k "$rockyou_gz" 2>/dev/null; then
+            if [[ -f "$rockyou_path" ]]; then
+                echo "$rockyou_path"
+                return 0
+            fi
+        fi
+        log_error "Failed to decompress rockyou.txt.gz"
+    fi
+
+    # Not found - need to install
+    log_warning "rockyou.txt not found"
+
+    # Non-interactive mode: do not prompt, just return 1
+    if [[ "${NR_NON_INTERACTIVE:-0}" == "1" ]]; then
+        return 1
+    fi
+
+    # Interactive mode: prompt to install
+    if ! confirm "Install wordlists package?" "n"; then
+        return 1
+    fi
+
+    # Distro-aware package installation
+    # Try wordlists first, then seclists as fallback
+    local -a packages_to_try=()
+
+    # Build package list based on distro family
+    case "${DISTRO_FAMILY:-unknown}" in
+        debian)
+            # Debian/Ubuntu/Kali: wordlists package contains rockyou
+            packages_to_try=("wordlists" "seclists")
+            ;;
+        arch)
+            # Arch: wordlists is often AUR, prefer seclists from community
+            packages_to_try=("seclists" "wordlists")
+            ;;
+        redhat)
+            # Fedora/RHEL: seclists may be available, rockyou may need manual
+            packages_to_try=("seclists" "wordlists")
+            ;;
+        suse)
+            # openSUSE: seclists may exist
+            packages_to_try=("seclists" "wordlists")
+            ;;
+        alpine)
+            # Alpine: likely none in default repos
+            packages_to_try=("seclists" "wordlists")
+            ;;
+        *)
+            # Unknown distro: try both
+            packages_to_try=("wordlists" "seclists")
+            ;;
+    esac
+
+    # Attempt installation
+    local pkg installed=false
+    for pkg in "${packages_to_try[@]}"; do
+        log_info "Attempting to install $pkg..."
+        if run_with_sudo $PKG_INSTALL "$pkg" 2>/dev/null; then
+            log_success "Installed $pkg"
+            installed=true
+            break
+        fi
+    done
+
+    if [[ "$installed" != "true" ]]; then
+        log_error "Failed to install wordlists package"
+        log_info "Manual install options:"
+        log_info "  - Download from: https://github.com/praetorian-inc/Hob0Rules"
+        log_info "  - Or: https://github.com/danielmiessler/SecLists"
+        return 1
+    fi
+
+    # Re-check after installation (recursive call)
+    ensure_rockyou
+}
+
+# require_wordlist() - Validate and return wordlist path
+# Args: $1 = wordlist path (optional, defaults to rockyou)
+# Outputs: validated wordlist path
+# Returns: 0 on success, 1 on failure
+require_wordlist() {
+    local path="$1"
+
+    # Default to rockyou if not specified
+    if [[ -z "$path" ]]; then
+        path=$(ensure_rockyou) || return 1
+    fi
+
+    # Validate: file exists
+    if [[ ! -f "$path" ]]; then
+        log_error "Wordlist not found: $path"
+        return 1
+    fi
+
+    # Validate: readable
+    if [[ ! -r "$path" ]]; then
+        log_error "Wordlist not readable: $path"
+        return 1
+    fi
+
+    # Validate: non-empty
+    if [[ ! -s "$path" ]]; then
+        log_error "Wordlist is empty: $path"
+        return 1
+    fi
+
+    echo "$path"
+    return 0
+}
+
+#═══════════════════════════════════════════════════════════════════════════════
 # EXPORT FUNCTIONS
 #═══════════════════════════════════════════════════════════════════════════════
 
@@ -817,3 +991,6 @@ export -f safe_rm safe_mkdir safe_copy safe_move
 
 # Misc
 export -f is_numeric random_string elapsed_time
+
+# Wordlist management
+export -f check_wordlists ensure_rockyou require_wordlist
