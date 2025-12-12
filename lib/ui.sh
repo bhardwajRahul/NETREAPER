@@ -79,6 +79,175 @@ draw_line() {
     printf '%*s\n' "$width" '' | tr ' ' "$char"
 }
 
+draw_header() {
+    local title="${1:-}" color="${2:-$C_CYAN}"
+    local width=70
+    local title_len=${#title}
+    local padding=$(( (width - title_len - 2) / 2 ))
+    local right_padding=$(( width - padding - title_len ))
+
+    echo -e "    ${color}╔$(printf '═%.0s' $(seq 1 $width))╗${C_RESET}"
+    echo -e "    ${color}║$(printf ' %.0s' $(seq 1 $padding))${C_BOLD}${title}${C_RESET}${color}$(printf ' %.0s' $(seq 1 $right_padding))║${C_RESET}"
+    echo -e "    ${color}╚$(printf '═%.0s' $(seq 1 $width))╝${C_RESET}"
+}
+
+#═══════════════════════════════════════════════════════════════════════════════
+# PROGRESS INDICATORS
+#═══════════════════════════════════════════════════════════════════════════════
+
+# Show animated spinner while a background process runs
+# Args: $1 = PID to wait for, $2 = message to display
+show_spinner() {
+    local pid="$1"
+    local message="${2:-Working...}"
+    local spinner_chars='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    local i=0
+
+    # Hide cursor if possible
+    tput civis 2>/dev/null || true
+
+    while kill -0 "$pid" 2>/dev/null; do
+        printf "\r ${C_CYAN}[%s]${C_RESET} %s" "${spinner_chars:$i:1}" "$message"
+        i=$(( (i + 1) % ${#spinner_chars} ))
+        sleep 0.1
+    done
+
+    # Restore cursor
+    tput cnorm 2>/dev/null || true
+    printf "\r ${C_GREEN}[✓]${C_RESET} %s\n" "$message"
+}
+
+# Run a command with spinner display
+# Args: $1 = message, $2... = command and arguments
+run_with_spinner() {
+    local message="$1"
+    shift
+
+    # Run the command in the background, redirecting its output (spinner is visual only)
+    "$@" &>/dev/null &
+    local cmd_pid=$!
+
+    show_spinner "$cmd_pid" "$message"
+    wait "$cmd_pid"
+    return $?
+}
+
+# Show a progress bar for iterative operations
+# Args: $1 = current, $2 = total, $3 = label (optional), $4 = width (optional)
+show_progress_bar() {
+    local current="$1"
+    local total="$2"
+    local label="${3:-Progress}"
+    local width="${4:-40}"
+
+    (( total <= 0 )) && total=1
+
+    local percent=$(( current * 100 / total ))
+    local filled=$(( current * width / total ))
+    local empty=$(( width - filled ))
+    local bar=""
+
+    local i
+    for (( i=0; i<filled; i++ )); do
+        bar+="█"
+    done
+    for (( i=0; i<empty; i++ )); do
+        bar+="░"
+    done
+
+    printf "\r ${C_CYAN}%s:${C_RESET} [%s] %3d%%" "$label" "$bar" "$percent"
+
+    if (( current >= total )); then
+        echo
+    fi
+}
+
+# Simple timers backed by an associative array
+declare -gA _TIMERS
+
+# Start a named timer
+# Args: $1 = timer name (default: "default")
+start_timer() {
+    local name="${1:-default}"
+    _TIMERS["$name"]="$(date +%s.%N)"
+}
+
+# Stop a timer and return elapsed time as formatted string
+# Args: $1 = timer name (default: "default")
+# Returns: formatted elapsed time string via stdout
+stop_timer() {
+    local name="${1:-default}"
+    local start="${_TIMERS[$name]:-}"
+
+    [[ -z "$start" ]] && return 1
+
+    local now elapsed
+    now="$(date +%s.%N)"
+
+    # Use bc if available for sub-second precision; fall back to integer seconds
+    if command -v bc &>/dev/null; then
+        elapsed="$(printf '%s - %s\n' "$now" "$start" | bc -l)"
+    else
+        elapsed=$(( ${now%.*} - ${start%.*} ))
+    fi
+
+    unset "_TIMERS[$name]"
+
+    # Pretty-print elapsed time
+    if command -v bc &>/dev/null && [[ "$elapsed" == *.* ]]; then
+        if (( $(printf '%s > 60\n' "$elapsed" | bc -l) )); then
+            local minutes seconds
+            minutes="$(printf '%s / 60\n' "$elapsed" | bc)"
+            seconds="$(printf '%s %% 60\n' "$elapsed" | bc)"
+            printf '%sm %ss' "$minutes" "$seconds"
+        else
+            printf '%.2fs' "$elapsed"
+        fi
+    else
+        # Integer seconds
+        if (( elapsed > 60 )); then
+            local minutes=$(( elapsed / 60 ))
+            local seconds=$(( elapsed % 60 ))
+            printf '%dm %ds' "$minutes" "$seconds"
+        else
+            printf '%ds' "$elapsed"
+        fi
+    fi
+}
+
+# Run a command and log its duration
+# Args: $1 = label for logging, $2... = command and arguments
+# Returns: exit status of the command
+timed_run() {
+    local label="$1"
+    shift
+
+    start_timer "$label"
+    "$@"
+    local status=$?
+
+    local duration
+    duration="$(stop_timer "$label" 2>/dev/null || echo '?')"
+    log_info "$label completed in $duration"
+
+    return $status
+}
+
+# Display countdown before an operation
+# Args: $1 = seconds to count down, $2 = message (optional)
+countdown() {
+    local seconds="$1"
+    local message="${2:-Starting in}"
+
+    local i
+    for (( i=seconds; i>0; i-- )); do
+        printf "\r ${C_YELLOW}%s %d...${C_RESET}" "$message" "$i"
+        sleep 1
+    done
+
+    printf "\r ${C_GREEN}%s GO!${C_RESET}     \n" "$message"
+}
+
 #═══════════════════════════════════════════════════════════════════════════════
 # SCREEN CONTROL
 #═══════════════════════════════════════════════════════════════════════════════
@@ -603,7 +772,11 @@ validate_port_range() {
 #═══════════════════════════════════════════════════════════════════════════════
 
 # Visual effects
-export -f typewriter spinner progress_bar draw_line
+export -f typewriter spinner progress_bar draw_line draw_header
+
+# Progress indicators
+export -f show_spinner run_with_spinner show_progress_bar
+export -f start_timer stop_timer timed_run countdown
 
 # Screen control
 export -f clear_screen pause

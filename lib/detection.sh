@@ -203,16 +203,98 @@ setup_package_manager() {
 }
 
 #═══════════════════════════════════════════════════════════════════════════════
+# TOOL REGISTRY
+#═══════════════════════════════════════════════════════════════════════════════
+
+# Tool to package name mapping
+# Maps logical tool name to OS package name for installation
+declare -gA TOOL_PACKAGES=(
+    [nmap]="nmap"
+    [masscan]="masscan"
+    [nikto]="nikto"
+    [hydra]="hydra"
+    [john]="john"
+    [hashcat]="hashcat"
+    [aircrack-ng]="aircrack-ng"
+    [airodump-ng]="aircrack-ng"
+    [aireplay-ng]="aircrack-ng"
+    [hping3]="hping3"
+    [tcpdump]="tcpdump"
+    [tshark]="tshark"
+    [whois]="whois"
+    [dig]="dnsutils"
+    [curl]="curl"
+    [jq]="jq"
+    [gobuster]="gobuster"
+    [netcat]="netcat"
+    [nc]="netcat"
+    [sqlmap]="sqlmap"
+    [wfuzz]="wfuzz"
+    [dirb]="dirb"
+    [sslscan]="sslscan"
+    [enum4linux]="enum4linux"
+    [nbtscan]="nbtscan"
+    [arp-scan]="arp-scan"
+    [iw]="iw"
+    [iwconfig]="wireless-tools"
+    [macchanger]="macchanger"
+    [reaver]="reaver"
+    [bully]="bully"
+    [wifite]="wifite"
+    [mdk4]="mdk4"
+    [hostapd]="hostapd"
+    [dnsmasq]="dnsmasq"
+)
+
+# Tool categories for organized status display
+# Maps category name to space-separated list of tools
+declare -gA TOOL_CATEGORIES=(
+    [recon]="nmap masscan whois dig arp-scan nbtscan"
+    [wireless]="aircrack-ng airodump-ng aireplay-ng iw iwconfig macchanger reaver bully wifite mdk4"
+    [scanning]="nmap nikto gobuster dirb sslscan"
+    [credentials]="hydra john hashcat"
+    [traffic]="tcpdump tshark"
+    [stress]="hping3 mdk4"
+    [web]="nikto gobuster sqlmap wfuzz dirb curl"
+    [enumeration]="enum4linux nbtscan whois"
+    [network]="hostapd dnsmasq netcat"
+    [utilities]="curl jq"
+)
+
+#═══════════════════════════════════════════════════════════════════════════════
 # TOOL DETECTION
 #═══════════════════════════════════════════════════════════════════════════════
 
 # Check if a tool/command is installed
-# Args: $1 = tool name (command to check)
+# Args: $1 = tool name, $2 = silent flag (1 = no log output)
 # Returns: 0 if installed, 1 if not
+# Falls back to common binary directories if command -v fails
 check_tool() {
     local tool="$1"
+    local silent="${2:-0}"
+    local tool_path=""
+
     [[ -z "$tool" ]] && return 1
-    command -v "$tool" &>/dev/null
+
+    # First try command -v (checks PATH)
+    if tool_path=$(command -v "$tool" 2>/dev/null); then
+        [[ "$silent" != "1" ]] && log_success "$tool: $tool_path"
+        return 0
+    fi
+
+    # Fallback: check common binary directories
+    local search_paths=("/usr/bin" "/usr/local/bin" "/usr/sbin" "/sbin" "/opt/bin")
+    for dir in "${search_paths[@]}"; do
+        if [[ -x "${dir}/${tool}" ]]; then
+            tool_path="${dir}/${tool}"
+            [[ "$silent" != "1" ]] && log_success "$tool: $tool_path"
+            return 0
+        fi
+    done
+
+    # Not found
+    [[ "$silent" != "1" ]] && log_error "$tool: NOT FOUND"
+    return 1
 }
 
 # Check if tool is installed with optional binary name
@@ -221,7 +303,7 @@ check_tool() {
 check_tool_installed() {
     local tool="$1"
     local binary="${2:-$tool}"
-    command -v "$binary" &>/dev/null
+    check_tool "$binary" 1
 }
 
 # Get path to a tool
@@ -229,7 +311,307 @@ check_tool_installed() {
 # Returns: path to tool or empty string
 get_tool_path() {
     local tool="$1"
-    command -v "$tool" 2>/dev/null || echo ""
+    local tool_path=""
+
+    # Try command -v first
+    if tool_path=$(command -v "$tool" 2>/dev/null); then
+        echo "$tool_path"
+        return 0
+    fi
+
+    # Fallback to common directories
+    local search_paths=("/usr/bin" "/usr/local/bin" "/usr/sbin" "/sbin" "/opt/bin")
+    for dir in "${search_paths[@]}"; do
+        if [[ -x "${dir}/${tool}" ]]; then
+            echo "${dir}/${tool}"
+            return 0
+        fi
+    done
+
+    echo ""
+    return 1
+}
+
+# Get tool version (best-effort version detection)
+# Args: $1 = tool name
+# Returns: version string or empty; exits 1 if tool missing or version not parseable
+check_tool_version() {
+    local tool="$1"
+    local version_output=""
+    local version=""
+
+    # Check if tool exists first
+    if ! check_tool "$tool" 1; then
+        return 1
+    fi
+
+    # Try common version flags in order
+    local version_flags=("--version" "-version" "-v" "-V")
+    for flag in "${version_flags[@]}"; do
+        # Capture first line of output, suppress errors
+        version_output=$("$tool" "$flag" 2>/dev/null | head -n1) || continue
+        if [[ -n "$version_output" ]]; then
+            # Extract version-looking token (e.g., 1.2.3, 7.94, etc.)
+            if [[ "$version_output" =~ ([0-9]+\.[0-9]+(\.[0-9]+)?([._-][a-zA-Z0-9]+)?) ]]; then
+                version="${BASH_REMATCH[1]}"
+                echo "$version"
+                return 0
+            fi
+        fi
+    done
+
+    # Could not parse version
+    return 1
+}
+
+#═══════════════════════════════════════════════════════════════════════════════
+# TOOL INSTALLATION
+#═══════════════════════════════════════════════════════════════════════════════
+
+# Auto-install a missing tool (interactive mode only)
+# Args: $1 = tool name
+# Returns: 0 on success, 1 on failure or declined
+auto_install_tool() {
+    local tool="$1"
+    local pkg=""
+
+    [[ -z "$tool" ]] && return 1
+
+    # Already installed - nothing to do
+    if check_tool "$tool" 1; then
+        return 0
+    fi
+
+    # Resolve package name from registry, fallback to tool name
+    pkg="${TOOL_PACKAGES[$tool]:-$tool}"
+
+    log_warning "$tool is not installed"
+
+    # Non-interactive mode: skip auto-install
+    if [[ "${NR_NON_INTERACTIVE:-0}" == "1" ]] || [[ ! -t 0 ]]; then
+        log_debug "Non-interactive mode: skipping auto-install for $tool"
+        return 1
+    fi
+
+    # Check if package manager is available
+    if [[ -z "${PKG_INSTALL:-}" ]]; then
+        log_error "Package manager not configured. Run detect_system first."
+        return 1
+    fi
+
+    # Prompt user for installation
+    if ! confirm "Install $tool (package: $pkg)?" "n"; then
+        log_info "User declined installation of $tool"
+        return 1
+    fi
+
+    # Attempt installation
+    log_info "Installing $pkg via package manager..."
+    # shellcheck disable=SC2086  # PKG_INSTALL intentionally uses word splitting
+    if run_with_sudo $PKG_INSTALL "$pkg"; then
+        # Verify installation succeeded
+        if check_tool "$tool" 1; then
+            log_success "$tool installed successfully"
+            log_audit "TOOL_INSTALL" "$tool" "success"
+            return 0
+        else
+            log_error "Package installed but $tool binary not found"
+            log_audit "TOOL_INSTALL" "$tool" "binary_not_found"
+            return 1
+        fi
+    else
+        log_error "Failed to install $tool"
+        log_audit "TOOL_INSTALL" "$tool" "failed"
+        return 1
+    fi
+}
+
+# Require multiple tools, auto-installing if needed
+# Args: list of tool names
+# Returns: 0 if all tools available, 1 if any missing
+require_tools() {
+    local missing=()
+    local tool=""
+
+    # Check each tool
+    for tool in "$@"; do
+        if ! check_tool "$tool" 1; then
+            missing+=("$tool")
+        fi
+    done
+
+    # All tools present
+    if [[ ${#missing[@]} -eq 0 ]]; then
+        return 0
+    fi
+
+    # Report missing tools
+    log_error "Missing tools: ${missing[*]}"
+
+    # Attempt auto-install for each missing tool
+    local failed=0
+    for tool in "${missing[@]}"; do
+        if ! auto_install_tool "$tool"; then
+            ((failed++))
+        fi
+    done
+
+    # Check if all tools now available
+    if [[ $failed -gt 0 ]]; then
+        return 1
+    fi
+
+    # Final verification
+    for tool in "${missing[@]}"; do
+        if ! check_tool "$tool" 1; then
+            log_error "Tool $tool still not available after install attempt"
+            return 1
+        fi
+    done
+
+    return 0
+}
+
+#═══════════════════════════════════════════════════════════════════════════════
+# TOOL STATUS DISPLAY
+#═══════════════════════════════════════════════════════════════════════════════
+
+# Source UI library for draw_header (if not already loaded)
+# Note: This is safe because ui.sh has multiple-source protection
+source "${BASH_SOURCE%/*}/ui.sh" 2>/dev/null || true
+
+# Show categorized tool status dashboard
+# Displays all tools by category with installed/missing indicators
+# Shows progress bar in interactive mode while scanning tools
+show_tool_status() {
+    local category=""
+    local tools=""
+    local tool=""
+    local installed_count=0
+    local missing_count=0
+    local current_tool=0
+    local total_tools=0
+    local interactive=1
+
+    # Check if interactive mode
+    [[ "${NR_NON_INTERACTIVE:-0}" == "1" ]] || [[ ! -t 1 ]] && interactive=0
+
+    # Count total tools first (for progress bar)
+    for category in "${!TOOL_CATEGORIES[@]}"; do
+        for tool in ${TOOL_CATEGORIES[$category]}; do
+            ((++total_tools))
+        done
+    done
+
+    # Show progress bar while scanning (interactive mode only)
+    if (( interactive && total_tools > 0 )); then
+        declare -f show_progress_bar &>/dev/null && show_progress_bar 0 "$total_tools" "Scanning tools" 30
+    fi
+
+    # Collect results in arrays to display after progress completes
+    declare -A category_results
+
+    # Iterate through categories and check tools
+    for category in "${!TOOL_CATEGORIES[@]}"; do
+        tools="${TOOL_CATEGORIES[$category]}"
+        local results=""
+
+        for tool in $tools; do
+            ((++current_tool))
+
+            # Update progress bar (interactive mode only)
+            if (( interactive && total_tools > 0 )); then
+                declare -f show_progress_bar &>/dev/null && show_progress_bar "$current_tool" "$total_tools" "Scanning tools" 30
+            fi
+
+            if check_tool "$tool" 1; then
+                results+="${C_GREEN}✓${C_RESET} $tool\n"
+                ((++installed_count))
+            else
+                results+="${C_RED}✗${C_RESET} $tool\n"
+                ((++missing_count))
+            fi
+        done
+
+        category_results["$category"]="$results"
+    done
+
+    # Draw header
+    if declare -f draw_header &>/dev/null; then
+        draw_header "Tool Status"
+    else
+        echo
+        echo -e "    ${C_BOLD}${C_CYAN}Tool Status${C_RESET}"
+        echo -e "    ${C_CYAN}════════════════════════════════════════════════════════════════════════${C_RESET}"
+    fi
+
+    # Display results by category
+    for category in "${!TOOL_CATEGORIES[@]}"; do
+        echo
+        echo -e "    ${C_BOLD}${C_YELLOW}${category^^}${C_RESET}"
+        echo -ne "    ${category_results[$category]}"
+    done
+
+    # Summary
+    echo
+    echo -e "    ${C_CYAN}────────────────────────────────────────────────────────────────────────${C_RESET}"
+    echo -e "    ${C_GREEN}Installed:${C_RESET} $installed_count  ${C_RED}Missing:${C_RESET} $missing_count"
+    echo
+}
+
+# Verify all registered tools are available (quick background check)
+# Uses spinner for visual feedback in interactive mode
+# Returns: 0 if all tools available, 1 if any missing
+# Sets: _VERIFY_INSTALLED, _VERIFY_MISSING (space-separated tool names)
+verify_tool_availability() {
+    local interactive=1
+    [[ "${NR_NON_INTERACTIVE:-0}" == "1" ]] || [[ ! -t 1 ]] && interactive=0
+
+    # Inner function to check all tools (runs in background with spinner)
+    _do_verify_tools() {
+        local installed_list=""
+        local missing_list=""
+        local tool=""
+
+        for tool in "${!TOOL_PACKAGES[@]}"; do
+            if check_tool "$tool" 1; then
+                installed_list+="$tool "
+            else
+                missing_list+="$tool "
+            fi
+        done
+
+        # Store results in temp files (background process can't set parent vars)
+        echo "${installed_list% }" > /tmp/.nr_verify_installed.$$
+        echo "${missing_list% }" > /tmp/.nr_verify_missing.$$
+    }
+
+    # Run with spinner in interactive mode, plain in non-interactive
+    if (( interactive )) && declare -f run_with_spinner &>/dev/null; then
+        run_with_spinner "Verifying tool availability" _do_verify_tools
+    else
+        _do_verify_tools
+    fi
+
+    # Read results from temp files
+    _VERIFY_INSTALLED=""
+    _VERIFY_MISSING=""
+    [[ -f /tmp/.nr_verify_installed.$$ ]] && _VERIFY_INSTALLED=$(< /tmp/.nr_verify_installed.$$)
+    [[ -f /tmp/.nr_verify_missing.$$ ]] && _VERIFY_MISSING=$(< /tmp/.nr_verify_missing.$$)
+
+    # Cleanup temp files
+    rm -f /tmp/.nr_verify_installed.$$ /tmp/.nr_verify_missing.$$ 2>/dev/null
+
+    # Count results
+    local installed_count=0
+    local missing_count=0
+    [[ -n "$_VERIFY_INSTALLED" ]] && installed_count=$(echo "$_VERIFY_INSTALLED" | wc -w)
+    [[ -n "$_VERIFY_MISSING" ]] && missing_count=$(echo "$_VERIFY_MISSING" | wc -w)
+
+    log_info "Tool verification complete: $installed_count installed, $missing_count missing"
+
+    # Return status based on missing tools
+    [[ $missing_count -eq 0 ]]
 }
 
 #═══════════════════════════════════════════════════════════════════════════════
@@ -303,7 +685,8 @@ get_default_interface() {
     # Method 3: Find first active interface
     if [[ -z "$iface" ]]; then
         for i in /sys/class/net/*; do
-            local name=$(basename "$i")
+            local name
+            name=$(basename "$i")
             [[ "$name" == "lo" ]] && continue
             if [[ "$(cat "/sys/class/net/$name/operstate" 2>/dev/null)" == "up" ]]; then
                 iface="$name"
@@ -366,7 +749,13 @@ export -f detect_distro detect_distro_family
 export -f detect_package_manager setup_package_manager
 
 # Tool detection
-export -f check_tool check_tool_installed get_tool_path
+export -f check_tool check_tool_installed get_tool_path check_tool_version
+
+# Tool installation
+export -f auto_install_tool require_tools
+
+# Tool status
+export -f show_tool_status verify_tool_availability
 
 # Network interfaces
 export -f check_interface is_wireless_interface

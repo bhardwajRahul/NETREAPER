@@ -24,7 +24,7 @@ source "$NETREAPER_ROOT/lib/version.sh"
 
 # Source core libraries in dependency order
 # Each lib has a guard to prevent multiple sourcing
-for lib in core ui safety detection utils; do
+for lib in core ui safety detection config utils; do
     # shellcheck source=/dev/null
     source "$NETREAPER_ROOT/lib/${lib}.sh" || {
         echo "ERROR: Failed to source lib/${lib}.sh" >&2
@@ -47,6 +47,56 @@ done
 
 # Create required directories (from core.sh)
 ensure_directories
+
+# Initialize configuration system (from config.sh)
+init_config
+
+# Apply configuration to runtime behavior
+_apply_config() {
+    local cfg_value=""
+
+    # Apply log_level from config
+    cfg_value=$(config_get log_level 2>/dev/null) || cfg_value=""
+    if [[ -n "$cfg_value" ]]; then
+        case "${cfg_value^^}" in
+            DEBUG|INFO|SUCCESS|WARNING|ERROR|FATAL)
+                set_log_level "$cfg_value"
+                ;;
+        esac
+    fi
+
+    # Apply file_logging from config
+    cfg_value=$(config_get file_logging 2>/dev/null) || cfg_value=""
+    if [[ -n "$cfg_value" ]]; then
+        if config_is_true "$cfg_value"; then
+            FILE_LOGGING=1
+        else
+            FILE_LOGGING=0
+        fi
+    fi
+
+    # Apply confirm_dangerous from config (interactive mode only)
+    # Note: This only affects interactive confirmations, not safety gates
+    cfg_value=$(config_get confirm_dangerous 2>/dev/null) || cfg_value=""
+    if [[ -n "$cfg_value" ]]; then
+        if config_is_true "$cfg_value"; then
+            export NR_CONFIRM_DANGEROUS=1
+        else
+            export NR_CONFIRM_DANGEROUS=0
+        fi
+    fi
+
+    # Apply warn_public_ip from config
+    cfg_value=$(config_get warn_public_ip 2>/dev/null) || cfg_value=""
+    if [[ -n "$cfg_value" ]]; then
+        if config_is_true "$cfg_value"; then
+            export NR_WARN_PUBLIC_IP=1
+        else
+            export NR_WARN_PUBLIC_IP=0
+        fi
+    fi
+}
+_apply_config
 
 # Detect system info (from detection.sh)
 detect_system
@@ -74,40 +124,53 @@ Commands:
   status          Show tool installation status
   scan <target>   Run a quick port scan
   wifi            WiFi operations
-  config path     Show config directory path
+  config          Configuration management
+    config show              Show all configuration
+    config get <key>         Get a configuration value
+    config set <key> <val>   Set a configuration value
+    config edit              Edit config file interactively
+    config path              Show config file path
+    config reset             Reset to default configuration
   help            Show this help message
 
 Examples:
   netreaper --version
   netreaper status
   netreaper scan 192.168.1.1
-  netreaper --dry-run scan 192.168.1.1
-  netreaper config path
+  netreaper config show
+  netreaper config set log_level DEBUG
 
 Run without arguments to launch the interactive menu.
 EOF
 }
 
 _show_status() {
-    # Delegate to module function if available
-    if declare -f show_tool_status &>/dev/null; then
-        show_tool_status
-        return
-    fi
-
-    # Fallback: basic status display
-    log_info "System: ${DISTRO:-unknown} (${DISTRO_FAMILY:-unknown})"
+    # Show system information first
+    echo
+    echo -e "    ${C_BOLD}${C_CYAN}System Information${C_RESET}"
+    echo -e "    ${C_CYAN}────────────────────────────────────────────────────────────────────────${C_RESET}"
+    log_info "Distribution: ${DISTRO:-unknown} (${DISTRO_FAMILY:-unknown})"
     log_info "Package manager: ${PKG_MANAGER:-unknown}"
     log_info "NETREAPER root: ${NETREAPER_ROOT}"
+    log_info "Config directory: ${CONFIG_DIR}"
     echo
-    log_info "Core tools:"
-    for tool in nmap aircrack-ng hashcat wireshark; do
-        if command -v "$tool" &>/dev/null; then
-            echo -e "    ${C_GREEN}[✓]${C_RESET} $tool"
-        else
-            echo -e "    ${C_RED}[✗]${C_RESET} $tool"
-        fi
-    done
+
+    # Delegate to tool status display
+    if declare -f show_tool_status &>/dev/null; then
+        show_tool_status
+    else
+        # Fallback: basic tool status display
+        echo -e "    ${C_BOLD}${C_CYAN}Tool Status${C_RESET}"
+        echo -e "    ${C_CYAN}────────────────────────────────────────────────────────────────────────${C_RESET}"
+        log_info "Core tools:"
+        for tool in nmap aircrack-ng hashcat wireshark tcpdump hydra; do
+            if command -v "$tool" &>/dev/null; then
+                echo -e "    ${C_GREEN}✓${C_RESET} $tool"
+            else
+                echo -e "    ${C_RED}✗${C_RESET} $tool"
+            fi
+        done
+    fi
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -140,15 +203,61 @@ main() {
             ;;
         config)
             case "${2:-}" in
+                show)
+                    config_show
+                    exit 0
+                    ;;
+                get)
+                    if [[ -z "${3:-}" ]]; then
+                        log_error "Missing key argument"
+                        echo "Usage: netreaper config get <key>"
+                        exit 1
+                    fi
+                    value=$(config_get "$3") || {
+                        log_error "Key not found: $3"
+                        exit 1
+                    }
+                    echo "$value"
+                    exit 0
+                    ;;
+                set)
+                    if [[ -z "${3:-}" ]] || [[ -z "${4:-}" ]]; then
+                        log_error "Missing key or value argument"
+                        echo "Usage: netreaper config set <key> <value>"
+                        exit 1
+                    fi
+                    config_set "$3" "$4"
+                    exit 0
+                    ;;
+                edit)
+                    config_edit
+                    exit $?
+                    ;;
                 path)
-                    echo "$CONFIG_DIR"
+                    config_path
+                    exit 0
+                    ;;
+                reset)
+                    if [[ "${NR_NON_INTERACTIVE:-0}" != "1" ]] && [[ -t 0 ]]; then
+                        if ! confirm "Reset configuration to defaults?" "n"; then
+                            log_info "Reset cancelled"
+                            exit 0
+                        fi
+                    fi
+                    config_reset
+                    exit 0
+                    ;;
+                "")
+                    # No subcommand - show config
+                    config_show
+                    exit 0
                     ;;
                 *)
                     log_error "Unknown config subcommand: ${2:-}"
-                    echo "Usage: netreaper config path"
+                    echo "Usage: netreaper config [show|get|set|edit|path|reset]"
+                    exit 1
                     ;;
             esac
-            exit 0
             ;;
         status)
             _show_status

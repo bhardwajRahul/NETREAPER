@@ -33,8 +33,10 @@ setup() {
 }
 
 @test "netreaper status command works" {
-    run "$NETREAPER" status --compact
+    run "$NETREAPER" status
     [ "$status" -eq 0 ]
+    # Verify key sections are present
+    [[ "$output" == *"System Information"* ]] || [[ "$output" == *"Tool Status"* ]]
 }
 
 @test "netreaper invalid command returns error" {
