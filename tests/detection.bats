@@ -13,8 +13,9 @@ setup() {
     # Source core first (required by detection)
     source "$NETREAPER_ROOT/lib/core.sh"
     source "$NETREAPER_ROOT/lib/detection.sh"
-    # Clear ERR trap to prevent interference with BATS test execution
+    # Clear ERR trap and pipefail to prevent interference with BATS test execution
     trap - ERR
+    set +o pipefail
 }
 
 #───────────────────────────────────────────────────────────────────────────────
@@ -134,8 +135,14 @@ setup() {
 }
 
 @test "get_tool_path returns empty for non-existent command" {
-    result=$(get_tool_path "this_command_definitely_does_not_exist_12345")
-    [ -z "$result" ]
+    run bash -c '
+        source ./lib/core.sh
+        source ./lib/detection.sh
+        p="$(get_tool_path definitely_not_a_real_command_12345 || true)"
+        printf "%s" "$p"
+    '
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
 }
 
 #───────────────────────────────────────────────────────────────────────────────
