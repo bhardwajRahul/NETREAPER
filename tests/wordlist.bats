@@ -156,29 +156,26 @@ teardown() {
     [[ "$output" == *"rockyou.txt not found"* ]]
 }
 
-@test "ensure_rockyou returns path if rockyou exists" {
-    # Skip if rockyou doesn't exist
-    if [[ ! -f "/usr/share/wordlists/rockyou.txt" ]]; then
-        skip "rockyou.txt not installed"
-    fi
+@test "ensure_rockyou returns existing rockyou path when present (mocked)" {
+    mkdir -p "$BATS_TMPDIR/usr/share/wordlists"
+    export WORDLIST_BASE="$BATS_TMPDIR/usr/share/wordlists"
+    echo "test" > "$WORDLIST_BASE/rockyou.txt"
 
     run ensure_rockyou
     [ "$status" -eq 0 ]
-    [ "$output" = "/usr/share/wordlists/rockyou.txt" ]
+    [ "$output" = "$WORDLIST_BASE/rockyou.txt" ]
 }
 
-@test "ensure_rockyou handles compressed rockyou.txt.gz" {
-    # Skip if neither exists
-    if [[ ! -f "/usr/share/wordlists/rockyou.txt" ]] && [[ ! -f "/usr/share/wordlists/rockyou.txt.gz" ]]; then
-        skip "Neither rockyou.txt nor rockyou.txt.gz exist"
-    fi
+@test "ensure_rockyou handles compressed rockyou.txt.gz (mocked)" {
+    mkdir -p "$BATS_TMPDIR/usr/share/wordlists"
+    export WORDLIST_BASE="$BATS_TMPDIR/usr/share/wordlists"
 
-    # If uncompressed exists, it should return that path
-    if [[ -f "/usr/share/wordlists/rockyou.txt" ]]; then
-        run ensure_rockyou
-        [ "$status" -eq 0 ]
-        [ "$output" = "/usr/share/wordlists/rockyou.txt" ]
-    fi
+    printf "password\nadmin\n" | gzip -c > "$WORDLIST_BASE/rockyou.txt.gz"
+
+    run ensure_rockyou
+    [ "$status" -eq 0 ]
+    [ -f "$WORDLIST_BASE/rockyou.txt" ]
+    [[ "$output" == *"rockyou.txt" ]]
 }
 
 #===============================================================================

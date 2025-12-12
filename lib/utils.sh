@@ -840,94 +840,34 @@ check_wordlists() {
 # ensure_rockyou() - Ensure rockyou.txt is available
 # Outputs: path to rockyou.txt on success
 # Returns: 0 on success, 1 on failure
+# Note: Respects WORDLIST_BASE env var for testing/custom paths
 ensure_rockyou() {
-    local rockyou_path="/usr/share/wordlists/rockyou.txt"
-    local rockyou_gz="${rockyou_path}.gz"
+    local base="${WORDLIST_BASE:-/usr/share/wordlists}"
+    local rockyou="$base/rockyou.txt"
+    local rockyou_gz="${rockyou}.gz"
 
-    # Already exists?
-    if [[ -f "$rockyou_path" ]]; then
-        echo "$rockyou_path"
-        return 0
-    fi
+    [[ -f "$rockyou" ]] && { echo "$rockyou"; return 0; }
 
-    # Compressed version exists?
     if [[ -f "$rockyou_gz" ]]; then
         log_info "Decompressing rockyou.txt.gz..."
-        if run_with_sudo gunzip -k "$rockyou_gz" 2>/dev/null; then
-            if [[ -f "$rockyou_path" ]]; then
-                echo "$rockyou_path"
-                return 0
-            fi
+
+        # If we can write here, don't sudo (so tests can mock cleanly)
+        if [[ -w "$base" ]]; then
+            gunzip -kf "$rockyou_gz" && { echo "$rockyou"; return 0; }
+        else
+            run_with_sudo gunzip -kf "$rockyou_gz" && { echo "$rockyou"; return 0; }
         fi
-        log_error "Failed to decompress rockyou.txt.gz"
     fi
 
-    # Not found - need to install
     log_warning "rockyou.txt not found"
 
-    # Non-interactive mode: do not prompt, just return 1
+    # Non-interactive must never prompt/install
     if [[ "${NR_NON_INTERACTIVE:-0}" == "1" ]]; then
         return 1
     fi
 
-    # Interactive mode: prompt to install
-    if ! confirm "Install wordlists package?" "n"; then
-        return 1
-    fi
-
-    # Distro-aware package installation
-    # Try wordlists first, then seclists as fallback
-    local -a packages_to_try=()
-
-    # Build package list based on distro family
-    case "${DISTRO_FAMILY:-unknown}" in
-        debian)
-            # Debian/Ubuntu/Kali: wordlists package contains rockyou
-            packages_to_try=("wordlists" "seclists")
-            ;;
-        arch)
-            # Arch: wordlists is often AUR, prefer seclists from community
-            packages_to_try=("seclists" "wordlists")
-            ;;
-        redhat)
-            # Fedora/RHEL: seclists may be available, rockyou may need manual
-            packages_to_try=("seclists" "wordlists")
-            ;;
-        suse)
-            # openSUSE: seclists may exist
-            packages_to_try=("seclists" "wordlists")
-            ;;
-        alpine)
-            # Alpine: likely none in default repos
-            packages_to_try=("seclists" "wordlists")
-            ;;
-        *)
-            # Unknown distro: try both
-            packages_to_try=("wordlists" "seclists")
-            ;;
-    esac
-
-    # Attempt installation
-    local pkg installed=false
-    for pkg in "${packages_to_try[@]}"; do
-        log_info "Attempting to install $pkg..."
-        if run_with_sudo $PKG_INSTALL "$pkg" 2>/dev/null; then
-            log_success "Installed $pkg"
-            installed=true
-            break
-        fi
-    done
-
-    if [[ "$installed" != "true" ]]; then
-        log_error "Failed to install wordlists package"
-        log_info "Manual install options:"
-        log_info "  - Download from: https://github.com/praetorian-inc/Hob0Rules"
-        log_info "  - Or: https://github.com/danielmiessler/SecLists"
-        return 1
-    fi
-
-    # Re-check after installation (recursive call)
-    ensure_rockyou
+    confirm "Install wordlists?" && run_with_sudo apt install -y wordlists && ensure_rockyou
+    return 1
 }
 
 # require_wordlist() - Validate and return wordlist path
