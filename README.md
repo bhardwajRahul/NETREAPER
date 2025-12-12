@@ -81,6 +81,7 @@ NETREAPER/
 │   ├── ui.sh              # Banners, menus, prompts, confirmations
 │   ├── safety.sh          # Target validation, authorization, unsafe mode
 │   ├── detection.sh       # Distro, package manager, tool, interface detection
+│   ├── config.sh          # Persistent configuration management
 │   └── utils.sh           # Timestamps, backups, safe file operations, tool execution
 ├── modules/
 │   ├── recon.sh           # Reconnaissance tools
@@ -106,6 +107,7 @@ NETREAPER/
 | `ui.sh` | Banner display, input sanitization, prompts (`confirm`, `confirm_dangerous`, `select_option`), progress indicators |
 | `safety.sh` | IP validation, CIDR matching, protected ranges, `validate_target()`, authorization checks, unsafe mode |
 | `detection.sh` | Distro detection, package manager setup, tool checks, wireless interface detection |
+| `config.sh` | Persistent configuration: `init_config()`, `config_get/set/show/edit`, atomic file writes |
 | `utils.sh` | Timestamps, file backups, cleanup handlers, safe file operations (`safe_rm`, `safe_copy`, `safe_move`), tool execution wrappers |
 
 ---
@@ -303,6 +305,74 @@ netreaper wizard scan
 
 ---
 
+## Configuration
+
+NETREAPER supports persistent configuration via a config file. Settings are applied at startup and can be overridden by environment variables.
+
+### Config File Location
+
+```
+~/.netreaper/config/config.conf
+```
+
+### Configuration Commands
+
+```bash
+# Show all configuration
+netreaper config show
+
+# Get a specific value
+netreaper config get log_level
+
+# Set a value (persists to file)
+netreaper config set log_level DEBUG
+
+# Edit config file interactively
+netreaper config edit
+
+# Show config file path
+netreaper config path
+
+# Reset to defaults
+netreaper config reset
+```
+
+### Default Configuration Values
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `log_level` | `INFO` | Logging threshold: DEBUG, INFO, SUCCESS, WARNING, ERROR, FATAL |
+| `file_logging` | `true` | Enable logging to file (`true`/`false`) |
+| `default_scan_type` | `standard` | Default scan type: quick, standard, full, stealth |
+| `confirm_dangerous` | `true` | Require confirmation for dangerous operations |
+| `warn_public_ip` | `true` | Warn when targeting public IP addresses |
+| `default_wordlist` | `/usr/share/wordlists/rockyou.txt` | Default wordlist for password attacks |
+| `non_interactive_default_index` | `0` | Default menu selection index (0-based) |
+| `unsafe_mode` | `false` | Disable safety checks (NOT RECOMMENDED) |
+
+### Environment Variable Precedence
+
+Environment variables **override** config file settings for CI/pipeline control:
+
+```bash
+# Config file sets log_level=INFO, but env var overrides
+NETREAPER_LOG_LEVEL=0 netreaper status  # Uses DEBUG level
+
+# Environment overrides for CI (these always take precedence)
+NR_NON_INTERACTIVE=1      # Forces non-interactive mode
+NR_UNSAFE_MODE=1          # Bypasses safety checks
+```
+
+**Priority order (highest to lowest):**
+
+1. Environment variables (`NR_*`, `NETREAPER_*`)
+2. Config file (`~/.netreaper/config/config.conf`)
+3. Built-in defaults
+
+**Note:** The config file is for user defaults and preferences. Safety-critical gates should be controlled via explicit environment variables in CI pipelines, not config file overrides.
+
+---
+
 ## CLI Usage Examples
 
 ```bash
@@ -375,6 +445,7 @@ NR_NON_INTERACTIVE=1 bats tests/*.bats
 | `tests/help.bats` | Help output validation |
 | `tests/syntax.bats` | Shell syntax checking |
 | `tests/detection.bats` | System/distro detection |
+| `tests/config.bats` | Configuration persistence, commands, non-interactive behavior |
 | `tests/smoke/*.sh` | Quick smoke tests for CI |
 
 ---

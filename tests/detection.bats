@@ -202,3 +202,98 @@ setup() {
 
     [ "$first_distro" = "$second_distro" ]
 }
+
+#───────────────────────────────────────────────────────────────────────────────
+# Tool registry tests
+#───────────────────────────────────────────────────────────────────────────────
+
+@test "TOOL_PACKAGES registry is populated" {
+    [ -n "${TOOL_PACKAGES[nmap]}" ]
+    [ "${TOOL_PACKAGES[nmap]}" = "nmap" ]
+}
+
+@test "TOOL_PACKAGES maps dig to dnsutils" {
+    [ "${TOOL_PACKAGES[dig]}" = "dnsutils" ]
+}
+
+@test "TOOL_PACKAGES maps aircrack suite tools" {
+    [ "${TOOL_PACKAGES[airodump-ng]}" = "aircrack-ng" ]
+    [ "${TOOL_PACKAGES[aireplay-ng]}" = "aircrack-ng" ]
+}
+
+@test "TOOL_CATEGORIES contains expected categories" {
+    [ -n "${TOOL_CATEGORIES[recon]}" ]
+    [ -n "${TOOL_CATEGORIES[wireless]}" ]
+    [ -n "${TOOL_CATEGORIES[scanning]}" ]
+    [ -n "${TOOL_CATEGORIES[credentials]}" ]
+}
+
+@test "TOOL_CATEGORIES recon contains nmap" {
+    [[ "${TOOL_CATEGORIES[recon]}" == *"nmap"* ]]
+}
+
+#───────────────────────────────────────────────────────────────────────────────
+# Tool version detection tests
+#───────────────────────────────────────────────────────────────────────────────
+
+@test "check_tool_version returns version for bash" {
+    result=$(check_tool_version "bash")
+    [ -n "$result" ]
+    # Should match version pattern like 5.1.16 or 5.2
+    [[ "$result" =~ ^[0-9]+\.[0-9]+ ]]
+}
+
+@test "check_tool_version returns 1 for non-existent tool" {
+    run check_tool_version "this_command_definitely_does_not_exist_12345"
+    [ "$status" -eq 1 ]
+}
+
+#───────────────────────────────────────────────────────────────────────────────
+# Tool installation tests (non-interactive behavior)
+#───────────────────────────────────────────────────────────────────────────────
+
+@test "auto_install_tool returns 0 for already installed tool" {
+    run auto_install_tool "bash"
+    [ "$status" -eq 0 ]
+}
+
+@test "auto_install_tool returns 1 in non-interactive mode for missing tool" {
+    export NR_NON_INTERACTIVE=1
+    run auto_install_tool "this_tool_does_not_exist_xyz123"
+    [ "$status" -eq 1 ]
+}
+
+@test "require_tools returns 0 when all tools present" {
+    run require_tools bash grep
+    [ "$status" -eq 0 ]
+}
+
+@test "require_tools returns 1 in non-interactive mode when tool missing" {
+    export NR_NON_INTERACTIVE=1
+    run require_tools "bash" "this_tool_does_not_exist_xyz123"
+    [ "$status" -eq 1 ]
+}
+
+#───────────────────────────────────────────────────────────────────────────────
+# Tool status display tests
+#───────────────────────────────────────────────────────────────────────────────
+
+@test "show_tool_status outputs Tool Status header" {
+    run show_tool_status
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Tool Status"* ]]
+}
+
+@test "show_tool_status shows category names" {
+    run show_tool_status
+    [ "$status" -eq 0 ]
+    # Should show at least one category (uppercased)
+    [[ "$output" == *"RECON"* ]] || [[ "$output" == *"SCANNING"* ]] || [[ "$output" == *"UTILITIES"* ]]
+}
+
+@test "show_tool_status shows installed/missing summary" {
+    run show_tool_status
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Installed:"* ]]
+    [[ "$output" == *"Missing:"* ]]
+}

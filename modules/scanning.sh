@@ -38,6 +38,31 @@ source "${BASH_SOURCE%/*}/../lib/utils.sh"
 # NMAP FUNCTIONS
 #═══════════════════════════════════════════════════════════════════════════════
 
+# Run a basic nmap scan with require_tools dependency gate
+# This is an example function demonstrating the require_tools and timed_run patterns
+# Args: $1 = target (IP, hostname, or CIDR)
+# Returns: 0 on success, 1 on failure
+run_nmap_scan() {
+    local target="${1:-}"
+
+    # Validate target using safety.sh
+    if ! validate_target "$target" "nmap_scan"; then
+        log_error "Invalid target: $target"
+        return 1
+    fi
+
+    # Check required tools with auto-install support (interactive only)
+    if ! require_tools nmap; then
+        log_error "Required tool 'nmap' is not available"
+        return 1
+    fi
+
+    log_audit "SCAN" "nmap_scan" "$target"
+
+    # Run nmap with timed_run for elapsed-time logging
+    timed_run "Nmap scan against $target" run_with_sudo nmap -sS -sV -T4 "$target"
+}
+
 # Run quick nmap scan
 # Args: $1 = target
 run_nmap_quick() {
@@ -583,7 +608,7 @@ scanning_menu() {
 #═══════════════════════════════════════════════════════════════════════════════
 
 # Nmap
-export -f run_nmap_quick run_nmap_full run_nmap_stealth run_nmap_udp
+export -f run_nmap_scan run_nmap_quick run_nmap_full run_nmap_stealth run_nmap_udp
 export -f run_nmap_vuln run_nmap_service run_nmap_os run_nmap_custom
 
 # Other scanners
