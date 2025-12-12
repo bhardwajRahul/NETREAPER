@@ -13,10 +13,10 @@
 
 <h1 align="center">NETREAPER</h1>
 <p align="center"><strong>Offensive Security Framework</strong></p>
-<p align="center">v6.2.5 — Phase 2: Safety & Confirmations</p>
+<p align="center">v6.3.1 — Phase 3: Core Infrastructure</p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-6.2.5-red?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/version-6.3.1-red?style=flat-square" alt="Version">
   <img src="https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square" alt="License">
   <img src="https://img.shields.io/badge/platform-Linux-lightgrey?style=flat-square" alt="Platform">
   <img src="https://img.shields.io/badge/shell-Bash%205.0+-green?style=flat-square" alt="Shell">
@@ -42,6 +42,9 @@ sudo ./install.sh
 ```
 
 The `install.sh` wrapper delegates to `bin/netreaper-install`, which handles tool installation, system-wide symlinks, and dependency management.
+
+> **⚠️ NETREAPER v5.x monolithic installs are obsolete and unsupported.**
+> The installer removes them automatically. If you have `/usr/local/bin/netreaper` from v5.x, it will be deleted during installation.
 
 **Running locally (without install):**
 
@@ -321,7 +324,7 @@ NETREAPER supports persistent configuration via a config file. Settings are appl
 # Show all configuration
 netreaper config show
 
-# Get a specific value
+# Get a specific value (outputs raw value only, suitable for scripting)
 netreaper config get log_level
 
 # Set a value (persists to file)
@@ -335,6 +338,25 @@ netreaper config path
 
 # Reset to defaults
 netreaper config reset
+```
+
+### Config Get Output
+
+The `config get` command outputs **only the raw value** with no headers, colors, or logging to stdout:
+
+```bash
+$ netreaper config get log_level
+INFO
+
+$ netreaper config get file_logging
+true
+```
+
+This makes it safe for use in scripts and CI pipelines:
+
+```bash
+level=$(netreaper config get log_level)
+[[ "$level" == "INFO" ]] && echo "Default level"
 ```
 
 ### Default Configuration Values
@@ -383,9 +405,8 @@ netreaper help
 # Show version (reads from VERSION file)
 netreaper --version
 
-# Check tool status
+# Check tool status (displays tool availability dashboard)
 netreaper status
-netreaper status --compact
 
 # Dry-run mode — preview commands without execution
 netreaper --dry-run scan 192.168.1.1
@@ -489,6 +510,7 @@ NETREAPER began as a personal toolkit for streamlining penetration testing workf
 
 - **Phase 1: Core refactoring** — Modular `lib`/`bin`/`modules` architecture, centralized version handling
 - **Phase 2: Safety & confirmations** — Target validation, authorization model, non-interactive CI support
+- **Phase 3: Core infrastructure** — Tool management, progress indicators, persistent configuration, CI correctness
 
 The project follows a "batteries included" philosophy: one CLI to rule all your security tools, with safety guardrails that don't get in your way.
 

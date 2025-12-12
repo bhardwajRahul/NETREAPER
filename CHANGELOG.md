@@ -2,6 +2,19 @@
 
 All notable changes to NETREAPER.
 
+## [6.3.1] - 2025-12-12
+
+### Fixed
+- Config command output for CI correctness (`config get` outputs raw values only)
+- All logging now goes to stderr, preserving stdout for data
+
+### Added
+- Protection against legacy v5.x monolithic installs (auto-removed during install)
+- Reinstall script (`reinstall-netreaper.sh`) for clean installation
+
+### Changed
+- Finalized Phase 3 core infrastructure (tools, progress, config)
+
 ## [6.2.4] - 2025-12-10
 
 ### Added
@@ -183,6 +196,7 @@ modules/osint.sh       - OSINT gathering
 
 ---
 
+[6.3.1]: https://github.com/Nerds489/NETREAPER/compare/v6.2.4...v6.3.1
 [6.2.4]: https://github.com/Nerds489/NETREAPER/compare/v6.2.3...v6.2.4
 [6.2.2]: https://github.com/Nerds489/NETREAPER/compare/v6.2.1...v6.2.2
 [6.2.1]: https://github.com/Nerds489/NETREAPER/compare/v6.2.0...v6.2.1
