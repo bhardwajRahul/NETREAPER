@@ -291,30 +291,149 @@ run_shodan_domain() {
 # WHOIS / DNS FUNCTIONS
 #═══════════════════════════════════════════════════════════════════════════════
 
-# Run WHOIS lookup
+# Run WHOIS lookup with caching and formatted output
 # Args: $1 = target domain/IP
+# Returns: 0 on success, 1 on failure
 run_whois() {
-    check_tool "whois" || return 1
-
     local target="$1"
+    local cache_ttl=86400  # 24 hours in seconds
 
+    # Validate input
     if [[ -z "$target" ]]; then
-        get_target_input "Target (domain/IP): " target
+        log_error "No target specified"
+        return 1
     fi
 
-    operation_header "WHOIS" "$target"
-    local start_ms=$(date +%s)
+    # Require whois tool
+    require_tools whois || return 1
 
-    log_audit "OSINT" "whois" "$target"
+    # Helper function: get file modification time (cross-platform)
+    _get_mtime() {
+        local file="$1"
+        local mtime=""
 
-    local outfile="${OUTPUT_DIR:-/tmp}/whois_$(timestamp_filename).txt"
+        # Try Linux stat first
+        if mtime=$(stat -c %Y "$file" 2>/dev/null); then
+            echo "$mtime"
+            return 0
+        fi
 
-    log_command_preview "whois ${target}"
-    whois "$target" 2>&1 | tee "$outfile"
+        # Try BSD/macOS stat
+        if mtime=$(stat -f %m "$file" 2>/dev/null); then
+            echo "$mtime"
+            return 0
+        fi
 
-    local duration=$(elapsed_time "$start_ms")
-    log_loot "Results saved: $outfile"
-    operation_summary "success" "WHOIS" "Duration: $duration"
+        # Fallback: return 0 (treat as expired)
+        echo "0"
+        return 0
+    }
+
+    # Determine cache directory
+    local cache_dir=""
+    if [[ -n "${NETREAPER_STATE_DIR:-}" ]]; then
+        cache_dir="${NETREAPER_STATE_DIR}/cache/whois"
+    elif [[ -n "${NETREAPER_HOME:-}" ]]; then
+        cache_dir="${NETREAPER_HOME}/cache/whois"
+    else
+        cache_dir="${HOME}/.netreaper/cache/whois"
+    fi
+
+    # Create cache directory
+    if declare -f ensure_dir &>/dev/null; then
+        ensure_dir "$cache_dir"
+    else
+        mkdir -p "$cache_dir" 2>/dev/null
+    fi
+
+    # Sanitize target for filename (replace unsafe chars with _)
+    local safe_target="${target//\//_}"
+    safe_target="${safe_target// /_}"
+    safe_target="${safe_target//[^a-zA-Z0-9._-]/_}"
+    local cache_file="${cache_dir}/${safe_target}.txt"
+
+    # Check cache
+    if [[ -f "$cache_file" ]]; then
+        local now=$(date +%s)
+        local file_mtime=$(_get_mtime "$cache_file")
+        local age=$((now - file_mtime))
+
+        if [[ $age -lt $cache_ttl ]]; then
+            # Cache hit - return cached content
+            draw_header "WHOIS: $target (cached)"
+
+            # Extract and display key fields from cache
+            local registrar org country
+            registrar=$(grep -iE "^Registrar:" "$cache_file" | head -1 | cut -d: -f2- | xargs)
+            org=$(grep -iE "^(Organization|Org):" "$cache_file" | head -1 | cut -d: -f2- | xargs)
+            country=$(grep -iE "^Country:" "$cache_file" | head -1 | cut -d: -f2- | xargs)
+
+            [[ -n "$registrar" ]] && echo -e "    ${C_CYAN}Registrar:${C_RESET}    $registrar"
+            [[ -n "$org" ]] && echo -e "    ${C_CYAN}Organization:${C_RESET} $org"
+            [[ -n "$country" ]] && echo -e "    ${C_CYAN}Country:${C_RESET}      $country"
+            echo ""
+
+            # Audit logging (guarded)
+            if declare -f log_audit &>/dev/null; then
+                log_audit "WHOIS" "$target" "cache_hit"
+            fi
+
+            # Interactive: offer to view raw output
+            if [[ "${NR_NON_INTERACTIVE:-0}" != "1" ]]; then
+                if confirm "View raw output?" "n"; then
+                    cat "$cache_file"
+                fi
+            fi
+
+            return 0
+        fi
+    fi
+
+    # Cache miss or expired - run whois
+    log_info "WHOIS lookup: $target..."
+
+    local output
+    if ! output=$(whois "$target" 2>&1); then
+        log_error "WHOIS lookup failed for $target"
+        return 1
+    fi
+
+    # Check if output is empty or error
+    if [[ -z "$output" ]]; then
+        log_error "WHOIS returned empty response"
+        return 1
+    fi
+
+    # Save to cache
+    echo "$output" > "$cache_file" 2>/dev/null
+
+    # Display formatted output
+    draw_header "WHOIS: $target"
+
+    # Extract and display key fields
+    local registrar org country
+    registrar=$(echo "$output" | grep -iE "^Registrar:" | head -1 | cut -d: -f2- | xargs)
+    org=$(echo "$output" | grep -iE "^(Organization|Org):" | head -1 | cut -d: -f2- | xargs)
+    country=$(echo "$output" | grep -iE "^Country:" | head -1 | cut -d: -f2- | xargs)
+
+    [[ -n "$registrar" ]] && echo -e "    ${C_CYAN}Registrar:${C_RESET}    $registrar"
+    [[ -n "$org" ]] && echo -e "    ${C_CYAN}Organization:${C_RESET} $org"
+    [[ -n "$country" ]] && echo -e "    ${C_CYAN}Country:${C_RESET}      $country"
+    echo ""
+
+    # Audit logging (guarded)
+    if declare -f log_audit &>/dev/null; then
+        log_audit "WHOIS" "$target"
+    fi
+
+    # Interactive: offer to view raw output
+    if [[ "${NR_NON_INTERACTIVE:-0}" != "1" ]]; then
+        if confirm "View raw output?" "n"; then
+            echo "$output"
+        fi
+    fi
+
+    return 0
 }
 
 # Run DNS enumeration with dig

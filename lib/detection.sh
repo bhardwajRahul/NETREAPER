@@ -31,6 +31,33 @@ readonly _NETREAPER_DETECTION_LOADED=1
 source "${BASH_SOURCE%/*}/core.sh"
 
 #═══════════════════════════════════════════════════════════════════════════════
+# WIRELESS DETECTION (single source of truth)
+#═══════════════════════════════════════════════════════════════════════════════
+
+# Check if interface is wireless (supports monitor mode)
+# Args: $1 = interface name
+# Returns: 0 if wireless, 1 if not
+is_wireless_interface() {
+    local iface="${1:-}"
+    [[ -z "$iface" ]] && return 1
+
+    # sysfs (most reliable if present)
+    [[ -d "/sys/class/net/$iface/wireless" ]] && return 0
+
+    # iw (modern)
+    if command -v iw &>/dev/null; then
+        iw dev "$iface" info &>/dev/null 2>&1 && return 0
+    fi
+
+    # /proc/net/wireless (older, but common; note leading whitespace)
+    if [[ -r /proc/net/wireless ]]; then
+        grep -q "^[[:space:]]*${iface}:" /proc/net/wireless 2>/dev/null && return 0
+    fi
+
+    return 1
+}
+
+#═══════════════════════════════════════════════════════════════════════════════
 # GLOBAL VARIABLES (set by detect_system)
 #═══════════════════════════════════════════════════════════════════════════════
 
@@ -781,18 +808,24 @@ check_interface() {
 # Check if interface is wireless (supports monitor mode)
 # Args: $1 = interface name
 # Returns: 0 if wireless, 1 if not
+# Uses multiple detection methods for maximum compatibility
 is_wireless_interface() {
     local iface="$1"
     [[ -z "$iface" ]] && return 1
 
-    # Check for wireless directory in sysfs
+    # Method 1: Check for wireless directory in sysfs (most reliable)
     if [[ -d "/sys/class/net/$iface/wireless" ]]; then
         return 0
     fi
 
-    # Fallback: try iw command
+    # Method 2: Try iw command (modern wireless stack)
     if command -v iw &>/dev/null; then
-        iw dev "$iface" info &>/dev/null && return 0
+        iw dev "$iface" info &>/dev/null 2>&1 && return 0
+    fi
+
+    # Method 3: Check /proc/net/wireless (legacy but reliable)
+    if grep -q "^${iface}:" /proc/net/wireless 2>/dev/null; then
+        return 0
     fi
 
     return 1

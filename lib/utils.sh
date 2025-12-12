@@ -791,6 +791,120 @@ elapsed_time() {
 }
 
 #═══════════════════════════════════════════════════════════════════════════════
+# WORDLIST MANAGEMENT
+#═══════════════════════════════════════════════════════════════════════════════
+
+# Wordlist search paths
+declare -ga WORDLIST_PATHS=(
+    "/usr/share/wordlists"
+    "/usr/share/seclists"
+    "$HOME/wordlists"
+)
+
+# Known wordlists mapping
+declare -gA KNOWN_WORDLISTS=(
+    [rockyou]="/usr/share/wordlists/rockyou.txt"
+    [common]="/usr/share/seclists/Passwords/Common-Credentials/10-million-password-list-top-1000000.txt"
+)
+
+# check_wordlists() - Display status of known wordlists
+# Returns: 0 always (status report), 1 if KNOWN_WORDLISTS is empty
+check_wordlists() {
+    log_info "Checking wordlists..."
+
+    # Warn if no wordlists defined
+    if [[ ${#KNOWN_WORDLISTS[@]} -eq 0 ]]; then
+        log_warning "No known wordlists defined"
+        return 1
+    fi
+
+    local name path
+    for name in "${!KNOWN_WORDLISTS[@]}"; do
+        path="${KNOWN_WORDLISTS[$name]}"
+
+        if [[ -f "$path" ]]; then
+            # File exists
+            echo -e "    ${C_GREEN}✓${C_RESET} $name: $path"
+        elif [[ -f "${path}.gz" ]]; then
+            # Compressed version exists
+            echo -e "    ${C_YELLOW}○${C_RESET} $name: ${path}.gz ${C_SHADOW}(compressed)${C_RESET}"
+        else
+            # Not found
+            echo -e "    ${C_RED}✗${C_RESET} $name: NOT FOUND"
+        fi
+    done
+
+    return 0
+}
+
+# ensure_rockyou() - Ensure rockyou.txt is available
+# Outputs: path to rockyou.txt on success
+# Returns: 0 on success, 1 on failure
+# Note: Respects WORDLIST_BASE env var for testing/custom paths
+ensure_rockyou() {
+    local base="${WORDLIST_BASE:-/usr/share/wordlists}"
+    local rockyou="$base/rockyou.txt"
+    local rockyou_gz="${rockyou}.gz"
+
+    [[ -f "$rockyou" ]] && { echo "$rockyou"; return 0; }
+
+    if [[ -f "$rockyou_gz" ]]; then
+        log_info "Decompressing rockyou.txt.gz..."
+
+        # If we can write here, don't sudo (so tests can mock cleanly)
+        if [[ -w "$base" ]]; then
+            gunzip -kf "$rockyou_gz" && { echo "$rockyou"; return 0; }
+        else
+            run_with_sudo gunzip -kf "$rockyou_gz" && { echo "$rockyou"; return 0; }
+        fi
+    fi
+
+    log_warning "rockyou.txt not found"
+
+    # Non-interactive must never prompt/install
+    if [[ "${NR_NON_INTERACTIVE:-0}" == "1" ]]; then
+        return 1
+    fi
+
+    confirm "Install wordlists?" && run_with_sudo apt install -y wordlists && ensure_rockyou
+    return 1
+}
+
+# require_wordlist() - Validate and return wordlist path
+# Args: $1 = wordlist path (optional, defaults to rockyou)
+# Outputs: validated wordlist path
+# Returns: 0 on success, 1 on failure
+require_wordlist() {
+    local path="$1"
+
+    # Default to rockyou if not specified
+    if [[ -z "$path" ]]; then
+        path=$(ensure_rockyou) || return 1
+    fi
+
+    # Validate: file exists
+    if [[ ! -f "$path" ]]; then
+        log_error "Wordlist not found: $path"
+        return 1
+    fi
+
+    # Validate: readable
+    if [[ ! -r "$path" ]]; then
+        log_error "Wordlist not readable: $path"
+        return 1
+    fi
+
+    # Validate: non-empty
+    if [[ ! -s "$path" ]]; then
+        log_error "Wordlist is empty: $path"
+        return 1
+    fi
+
+    echo "$path"
+    return 0
+}
+
+#═══════════════════════════════════════════════════════════════════════════════
 # EXPORT FUNCTIONS
 #═══════════════════════════════════════════════════════════════════════════════
 
@@ -817,3 +931,6 @@ export -f safe_rm safe_mkdir safe_copy safe_move
 
 # Misc
 export -f is_numeric random_string elapsed_time
+
+# Wordlist management
+export -f check_wordlists ensure_rockyou require_wordlist
